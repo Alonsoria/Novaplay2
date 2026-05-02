@@ -53,9 +53,9 @@ $subs = [
         'class'    => 'xbox',
         'badge'    => 'Xbox',
         'plans'    => [
-            ['name' => 'Xbox Game Pass Core',     'price' => '$4.99',  'period' => '/mes',  'features' => ['Más de 25 juegos de consola', 'Descuentos exclusivos para miembros', 'Multiplayer online']],
-            ['name' => 'Xbox Game Pass PC',       'price' => '$9.99',  'period' => '/mes',  'features' => ['Más de 100 juegos de PC', 'EA Play incluido', 'Nuevos juegos el día de lanzamiento']],
-            ['name' => 'Xbox Game Pass Ultimate', 'price' => '$14.99', 'period' => '/mes',  'features' => ['Todo lo de Core + PC', 'Xbox Live Gold incluido', 'Cloud gaming en móvil y tablet', 'EA Play incluido']],
+            ['name' => 'Xbox Game Pass Essential',     'price' => '$129',  'period' => '/mes',  'features' => ['Más de 50 juegos en la consola Xbox, PC y dispositivos compatibles', 'Juegos multijugador en línea para consola', 'Beneficios para juegos como League of Legends y Call of Duty: Warzone']],
+            ['name' => 'Xbox Game Pass Premium',     'price' => '$179',  'period' => '/mes',  'features' => ['Más de 200 juegos en la consola Xbox, PC y dispositivos compatibles', 'Beneficios para juegos como League of Legends y Call of Duty: Warzone', 'Juegos multijugador en línea para consola']],
+            ['name' => 'Xbox Game Pass Ultimate', 'price' => '$289', 'period' => '/mes',  'features' => ['Más de 400 juegos en la consola Xbox, PC y dispositivos compatibles','Nuevos juegos desde el mismo día de su lanzamiento','Incluye Club de Fortnite, EA Play y Ubisoft+ Classics', 'Juegos multijugador en línea para consola', 'Cloud gaming en móvil y tablet']]
         ],
         'btn_text' => 'Ver planes Xbox',
         'btn_id'   => 'btnXbox',
@@ -64,9 +64,9 @@ $subs = [
         'class'    => 'playstation',
         'badge'    => 'PlayStation',
         'plans'    => [
-            ['name' => 'PS Plus Essential', 'price' => '$8.99',  'period' => '/mes', 'features' => ['2-3 juegos gratis al mes', 'Descuentos exclusivos', 'Almacenamiento en la nube', 'Multijugador online']],
-            ['name' => 'PS Plus Extra',     'price' => '$14.99', 'period' => '/mes', 'features' => ['Todo lo de Essential', 'Catálogo de +400 juegos PS4/PS5', 'Juegos de Ubisoft+']],
-            ['name' => 'PS Plus Premium',   'price' => '$17.99', 'period' => '/mes', 'features' => ['Todo lo de Extra', 'Catálogo clásico (PS1/PS2/PSP)', 'Streaming de juegos', 'Pruebas de tiempo limitado']],
+            ['name' => 'PS Plus Essential', 'price' => '$119',  'period' => '/mes', 'features' => ['Juegos mensuales: puedes descargar y jugar títulos nuevos cada mes mientras tengas la suscripción.', 'Multijugador online: acceso para jugar en línea con otros jugadores.', 'Descuentos exclusivos: ofertas especiales en la tienda de PlayStation.']],
+            ['name' => 'PS Plus Extra',     'price' => '$179', 'period' => '/mes', 'features' => ['Todo lo de Essential', 'Catálogo de cientos de juegos (PS4 y PS5)', 'Juegos de Ubisoft+']],
+            ['name' => 'PS Plus Deluxe',   'price' => '$209', 'period' => '/mes', 'features' => ['Todo lo de Extra', 'Catálogo clásico (PS1/PS2/PSP)', 'Streaming de juegos', 'Pruebas de tiempo limitado']],
         ],
         'btn_text' => 'Ver planes PS Plus',
         'btn_id'   => 'btnPS',
@@ -75,9 +75,8 @@ $subs = [
         'class'    => 'nintendo',
         'badge'    => 'Nintendo',
         'plans'    => [
-            ['name' => 'Nintendo Online Individual', 'price' => '$3.99',  'period' => '/mes', 'features' => ['Multijugador online', 'NES + SNES clásicos', 'Almacenamiento en la nube']],
-            ['name' => 'Nintendo Online Familiar',   'price' => '$6.99',  'period' => '/mes', 'features' => ['Hasta 8 miembros', 'Todos los beneficios individuales', 'Juegos clásicos compartidos']],
-            ['name' => 'Nintendo Online + Paquete Expansión', 'price' => '$14.99', 'period' => '/mes', 'features' => ['Todo lo anterior', 'N64 + Genesis + GBA + GBC', 'DLC gratuito de juegos', 'Animal Crossing Happy Home DLC']],
+            ['name' => 'Nintendo Switch Online ', 'price' => '$309',  'period' => '/año', 'features' => ['Multijugador online', 'NES + SNES clásicos', 'Almacenamiento en la nube', 'Ofertas exclusivas']],
+            ['name' => 'Nintendo Switch Online + Paquete Expansión', 'price' => '$859', 'period' => '/año', 'features' => ['Todo lo del plan básico', 'Más juegos clásicos (N64 + Genesis + GBA + GBC)', 'DLC gratuito de juegos']]
         ],
         'btn_text' => 'Ver planes Nintendo',
         'btn_id'   => 'btnNintendo',

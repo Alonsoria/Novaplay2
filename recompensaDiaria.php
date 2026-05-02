@@ -3,6 +3,7 @@
  * NOVAPLAY — RECOMPENSADIARIA.PHP
  * Sistema de recompensa diaria por login con racha (streak) semanal.
  * Día 1-3: 3 pts | Día 4-6: 5 pts | Día 7: 7 pts → se reinicia
+ * Reinicio global a las 00:00 CST (America/Mexico_City = UTC-6).
  */
 
 $pageTitle = 'Recompensa Diaria';
@@ -13,10 +14,20 @@ $uid = (int)$_SESSION['user_id'];
 $msg = '';
 $msgType = '';
 
+/* ── Zona horaria fija: CST / UTC-6 ── */
+$tz   = new DateTimeZone('America/Mexico_City');
+$now  = new DateTime('now', $tz);
+$hoy  = $now->format('Y-m-d');
+$ayer = (clone $now)->modify('-1 day')->format('Y-m-d');
+
+/* Tiempo restante hasta el próximo reinicio (medianoche CST) */
+$midnight     = new DateTime('tomorrow midnight', $tz);
+$diffReset    = $now->diff($midnight);
+$tiempoReset  = sprintf('%02d:%02d:%02d', $diffReset->h, $diffReset->i, $diffReset->s);
+$segsReset    = $diffReset->h * 3600 + $diffReset->i * 60 + $diffReset->s;
+
 /* Puntos por día del ciclo de 7 días (índice 0=Día1 … 6=Día7) */
 $puntosXDia = [3, 3, 3, 5, 5, 5, 7];
-$hoy  = date('Y-m-d');
-$ayer = date('Y-m-d', strtotime('-1 day'));
 
 /* ── Manejar reclamación (POST) ── */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -187,16 +198,57 @@ $ptsHoy = $puntosXDia[$diaDestacado - 1];
       </button>
     </form>
   <?php else: ?>
-    <div style="margin-top:var(--space-lg);text-align:center;">
+    <div style="margin-top:var(--space-lg);text-align:center;display:flex;flex-direction:column;align-items:center;gap:var(--space-md);">
       <p class="text-muted">
-        <i class="fa-solid fa-clock" aria-hidden="true"></i>
+        <i class="fa-solid fa-circle-check" style="color:var(--clr-success);" aria-hidden="true"></i>
         Ya reclamaste tu recompensa de hoy. ¡Vuelve mañana para el Día <?= ($rachaActual >= 7) ? 1 : $rachaActual + 1 ?>!
       </p>
+      <!-- Countdown al reinicio 00:00 CST -->
+      <div style="
+        display:inline-flex;align-items:center;gap:var(--space-sm);
+        background:var(--clr-surface-2);border:1px solid var(--clr-border);
+        border-radius:var(--radius-md);padding:var(--space-sm) var(--space-lg);">
+        <i class="fa-solid fa-hourglass-half" style="color:var(--clr-accent);" aria-hidden="true"></i>
+        <span style="font-size:.85rem;color:var(--clr-text-muted);">Próximo reinicio en</span>
+        <span id="reward-countdown"
+              style="font-family:var(--font-display);font-size:1.2rem;font-weight:700;
+                     color:var(--clr-neon);letter-spacing:.08em;"
+              data-secs="<?= $segsReset ?>">
+          <?= $tiempoReset ?>
+        </span>
+      </div>
       <a href="productos.php" class="btn mt-md">
         <i class="fa-solid fa-gamepad" aria-hidden="true"></i>
         Ver juegos
       </a>
     </div>
+    <script>
+    (function () {
+      var el = document.getElementById('reward-countdown');
+      if (!el) return;
+      var secs = parseInt(el.dataset.secs, 10) || 0;
+
+      function fmt(s) {
+        var h = Math.floor(s / 3600);
+        var m = Math.floor((s % 3600) / 60);
+        var sec = s % 60;
+        return (h < 10 ? '0' : '') + h + ':' +
+               (m < 10 ? '0' : '') + m + ':' +
+               (sec < 10 ? '0' : '') + sec;
+      }
+
+      var timer = setInterval(function () {
+        secs--;
+        if (secs <= 0) {
+          clearInterval(timer);
+          /* Reinicio: recargar para que el servidor calcule el nuevo día */
+          window.location.reload();
+          return;
+        }
+        el.textContent = fmt(secs);
+      }, 1000);
+    })();
+    </script>
   <?php endif; ?>
 
 </main>

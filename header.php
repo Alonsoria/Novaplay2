@@ -42,6 +42,13 @@ if (is_logged_in()) {
         }
     } catch (mysqli_sql_exception $e) {}
 
+    /* Total de pedidos del usuario (para numeración #1, #2… igual que perfil) */
+    $totalPedidosNotif = 0;
+    try {
+        $resCnt = $conn->query("SELECT COUNT(*) AS c FROM pedidos WHERE id_usuario = $uid");
+        if ($resCnt) $totalPedidosNotif = (int)($resCnt->fetch_assoc()['c'] ?? 0);
+    } catch (mysqli_sql_exception $e) {}
+
     /* Códigos de los pedidos recientes (para "Ver detalle" en el panel) */
     $codigosNotif = [];
     if (!empty($pedidosRecientes)) {
@@ -87,8 +94,11 @@ if (is_logged_in()) {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
   <link rel="stylesheet" href="style.css">
+  <!-- animate.css — animaciones de entrada/salida en clases CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+  <!-- AOS — Animate On Scroll -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
   <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
   <style>
     /* ── Tooltips del sidebar ── */
@@ -249,9 +259,30 @@ if (is_logged_in()) {
     <?php endif; ?>
   </nav>
 
+  <!-- Acciones rápidas (derecha del header, solo en móvil) -->
+  <div class="site-header__actions">
+    <a href="carrito.php" class="site-header__action-btn site-header__action-cart" aria-label="Carrito" style="position:relative;">
+      <i class="fa-solid fa-cart-shopping"></i>
+      <?php if ($cartCount > 0): ?>
+        <span class="cart-count-badge"><?= $cartCount ?></span>
+      <?php endif; ?>
+    </a>
+    <?php if (is_logged_in()): ?>
+      <a href="perfil.php" class="site-header__action-btn" aria-label="Mi Perfil">
+        <span class="user-avatar" style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--clr-white);background:var(--clr-accent);font-size:1rem;font-weight:700;flex-shrink:0;">
+          <?= strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1)) ?>
+        </span>
+      </a>
+    <?php else: ?>
+      <a href="login.php" class="site-header__action-btn" aria-label="Iniciar sesión">
+        <i class="fa-solid fa-right-to-bracket"></i>
+      </a>
+    <?php endif; ?>
+  </div>
+
   <!-- Botón hamburguesa (mobile) -->
   <button class="site-header__burger" id="burgerBtn"
-          aria-label="Abrir menú" aria-expanded="false" aria-controls="mobileNav">
+          aria-label="Abrir menú" aria-expanded="false" aria-controls="sidebar">
     <span></span><span></span><span></span>
   </button>
 
@@ -277,7 +308,12 @@ if (is_logged_in()) {
 </nav>
 
 <!-- ═══════════════════════════ SIDEBAR ═══════════════════════════ -->
-<aside class="sidebar" aria-label="Navegación lateral">
+<aside class="sidebar" id="sidebar" aria-label="Navegación lateral">
+
+  <!-- Botón cerrar (solo visible en off-canvas / móvil) -->
+  <button class="sidebar-close-btn" id="sidebarCloseBtn" aria-label="Cerrar menú lateral">
+    <i class="fa-solid fa-xmark"></i>
+  </button>
 
   <a href="index.php" class="sidebar-icon" title="Inicio" data-tooltip="Inicio" aria-label="Inicio">
     <i class="fa-solid fa-house"></i>
@@ -354,9 +390,14 @@ if (is_logged_in()) {
     <?php else: ?>
       <!-- Logueado con pedidos -->
       <ul class="notif-list">
-        <?php foreach ($pedidosRecientes as $ped):
-          $pedId   = (int)$ped['id_pedido'];
-          $hasCods = !empty($codigosNotif[$pedId]);
+        <?php
+          /* Mismo esquema que perfil.php: el pedido más reciente recibe el número
+             más alto, bajando hasta #1 para el más antiguo del lote. */
+          $numActualNotif = min($totalPedidosNotif, count($pedidosRecientes));
+          foreach ($pedidosRecientes as $ped):
+            $pedId      = (int)$ped['id_pedido'];
+            $numDisplay = $numActualNotif--;
+            $hasCods    = !empty($codigosNotif[$pedId]);
         ?>
           <li class="notif-item" style="flex-direction:column;align-items:flex-start;gap:6px;">
             <div style="display:flex;align-items:center;gap:10px;width:100%;">
@@ -365,7 +406,7 @@ if (is_logged_in()) {
                    style="color:var(--clr-<?= $ped['estado'] === 'pagado' ? 'success' : 'warning' ?>);"></i>
               </div>
               <div class="notif-item__body" style="flex:1;">
-                <span class="notif-item__title">Pedido #<?= $pedId ?></span>
+                <span class="notif-item__title">Pedido #<?= $numDisplay ?></span>
                 <span class="notif-item__meta">
                   $<?= number_format((float)$ped['total'], 2) ?> —
                   <span style="color:var(--clr-<?= $ped['estado'] === 'pagado' ? 'success' : 'warning' ?>);">
@@ -425,6 +466,9 @@ if (is_logged_in()) {
   </div>
 
 </aside>
+
+<!-- Overlay para sidebar off-canvas -->
+<div id="sidebarOverlay" class="sidebar-overlay" aria-hidden="true"></div>
 
 <!-- ═══════════════════════════ BOTTOM NAV ═══════════════════════════ -->
 <nav class="bottom-nav" aria-label="Navegación rápida móvil">

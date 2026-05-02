@@ -13,6 +13,9 @@
 ════════════════════════════════════════════════ -->
 <footer class="footer">
   <div class="footer-container">
+        <p class="footer-note">
+      &copy; <?= date('Y') ?> Novaplay - E-commerce de Videojuegos
+    </p>
     <div class="footer-links">
       <a href="aviso_privacidad.php">Aviso de Privacidad</a>
       <a href="terminos.php">Términos y Condiciones</a>
@@ -20,7 +23,7 @@
       <a href="about.php">Acerca de NovaPlay</a>
     </div>
     <p class="footer-note">
-      &copy; <?= date('Y') ?> NovaPlay. Todos los derechos reservados.
+      La información proporcionada será tratada conforme a nuestro Aviso de Privacidad.
     </p>
   </div>
 </footer>
@@ -28,27 +31,48 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS GLOBALES
 ════════════════════════════════════════════════ -->
-<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+<!-- AOS — Animate On Scroll -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+<!-- Vanilla Tilt — efecto 3D tilt en cards -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.1/vanilla-tilt.min.js"></script>
 
 <script>
-/* ─── Menú hamburguesa (mobile) ─── */
+/* ─── Sidebar off-canvas (mobile) ─── */
 (function () {
-  const burger   = document.getElementById('burgerBtn');
-  const mobileNav = document.getElementById('mobileNav');
-  if (!burger || !mobileNav) return;
+  const burger    = document.getElementById('burgerBtn');
+  const sidebar   = document.getElementById('sidebar');
+  const overlay   = document.getElementById('sidebarOverlay');
+  const closeBtn  = document.getElementById('sidebarCloseBtn');
+  if (!burger || !sidebar) return;
 
-  burger.addEventListener('click', function () {
-    const open = mobileNav.classList.toggle('open');
-    burger.setAttribute('aria-expanded', open);
-    burger.setAttribute('aria-label', open ? 'Cerrar menú' : 'Abrir menú');
+  function openSidebar() {
+    sidebar.classList.add('open');
+    if (overlay)  { overlay.classList.add('open');  overlay.setAttribute('aria-hidden', 'false'); }
+    burger.classList.add('open');
+    burger.setAttribute('aria-expanded', 'true');
+    burger.setAttribute('aria-label', 'Cerrar menú');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    if (overlay)  { overlay.classList.remove('open'); overlay.setAttribute('aria-hidden', 'true'); }
+    burger.classList.remove('open');
+    burger.setAttribute('aria-expanded', 'false');
+    burger.setAttribute('aria-label', 'Abrir menú');
+    document.body.style.overflow = '';
+  }
+
+  burger.addEventListener('click', function (e) {
+    e.stopPropagation();
+    sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
   });
 
-  /* Cierra al hacer clic fuera */
-  document.addEventListener('click', function (e) {
-    if (!burger.contains(e.target) && !mobileNav.contains(e.target)) {
-      mobileNav.classList.remove('open');
-      burger.setAttribute('aria-expanded', 'false');
-    }
+  if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
+  if (overlay)  overlay.addEventListener('click', closeSidebar);
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeSidebar();
   });
 })();
 
@@ -216,6 +240,108 @@
         icon.appendChild(el);
         el.addEventListener('animationend', function () { el.remove(); });
       });
+    });
+  });
+})();
+
+/* ─── AOS — añadir atributos data-aos dinámicamente ─── */
+(function () {
+  if (typeof AOS === 'undefined') return;
+
+  document.querySelectorAll('.card').forEach(function (el, i) {
+    if (!el.hasAttribute('data-aos')) {
+      el.setAttribute('data-aos', 'fade-up');
+      el.setAttribute('data-aos-delay', String((i % 5) * 70));
+      el.setAttribute('data-aos-duration', '550');
+    }
+  });
+
+  document.querySelectorAll('.combo-card').forEach(function (el, i) {
+    if (!el.hasAttribute('data-aos')) {
+      el.setAttribute('data-aos', 'zoom-in');
+      el.setAttribute('data-aos-delay', String(i * 90));
+    }
+  });
+
+  document.querySelectorAll('.reward-day').forEach(function (el, i) {
+    if (!el.hasAttribute('data-aos')) {
+      el.setAttribute('data-aos', 'flip-left');
+      el.setAttribute('data-aos-delay', String(i * 55));
+      el.setAttribute('data-aos-duration', '500');
+    }
+  });
+
+  document.querySelectorAll('.team-card').forEach(function (el, i) {
+    if (!el.hasAttribute('data-aos')) {
+      el.setAttribute('data-aos', 'fade-up');
+      el.setAttribute('data-aos-delay', String(i * 100));
+    }
+  });
+
+  document.querySelectorAll('main > h2, .sub-title').forEach(function (el) {
+    if (!el.hasAttribute('data-aos')) {
+      el.setAttribute('data-aos', 'fade-right');
+      el.setAttribute('data-aos-duration', '600');
+    }
+  });
+
+  AOS.init({
+    duration: 600,
+    once: true,
+    offset: 40,
+    easing: 'ease-out-cubic'
+  });
+})();
+
+/* ─── Vanilla Tilt — efecto 3D en cards ─── */
+(function () {
+  if (typeof VanillaTilt === 'undefined') return;
+
+  var isMobile = window.matchMedia('(max-width: 768px)').matches;
+  if (isMobile) return;
+
+  VanillaTilt.init(document.querySelectorAll('.card'), {
+    max: 8,
+    speed: 400,
+    glare: true,
+    'max-glare': 0.12,
+    scale: 1.03,
+    gyroscope: false
+  });
+
+  VanillaTilt.init(document.querySelectorAll('.combo-card'), {
+    max: 5,
+    speed: 400,
+    glare: true,
+    'max-glare': 0.08,
+    scale: 1.02,
+    gyroscope: false
+  });
+})();
+
+/* ─── Sparkles — efecto de partículas neon en botones ─── */
+(function () {
+  var colors = ['#00f5ff', '#ff2d78', '#a855f7', '#39ff14', '#ffe600'];
+
+  document.querySelectorAll('.btn, .btn2, .btn-sub').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      var rect = btn.getBoundingClientRect();
+      var cx = e.clientX - rect.left;
+      var cy = e.clientY - rect.top;
+
+      for (var i = 0; i < 8; i++) {
+        var spark = document.createElement('span');
+        spark.className = 'nv-spark';
+        var angle = (i / 8) * Math.PI * 2;
+        var dist  = 28 + Math.random() * 20;
+        spark.style.setProperty('--sx', Math.cos(angle) * dist + 'px');
+        spark.style.setProperty('--sy', Math.sin(angle) * dist + 'px');
+        spark.style.left = cx + 'px';
+        spark.style.top  = cy + 'px';
+        spark.style.background = colors[Math.floor(Math.random() * colors.length)];
+        btn.appendChild(spark);
+        spark.addEventListener('animationend', function () { spark.remove(); });
+      }
     });
   });
 })();
