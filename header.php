@@ -41,6 +41,38 @@ if (is_logged_in()) {
             while ($row = $resPed->fetch_assoc()) $pedidosRecientes[] = $row;
         }
     } catch (mysqli_sql_exception $e) {}
+
+    /* Códigos de los pedidos recientes (para "Ver detalle" en el panel) */
+    $codigosNotif = [];
+    if (!empty($pedidosRecientes)) {
+        try {
+            $pids = array_column($pedidosRecientes, 'id_pedido');
+            $phs  = implode(',', array_fill(0, count($pids), '?'));
+            $stmtCN = $conn->prepare(
+                "SELECT id_pedido, nombre_producto, codigo
+                 FROM codigos_activacion
+                 WHERE id_pedido IN ($phs)
+                 ORDER BY id"
+            );
+            $stmtCN->bind_param(str_repeat('i', count($pids)), ...$pids);
+            $stmtCN->execute();
+            $rCN = $stmtCN->get_result();
+            while ($r = $rCN->fetch_assoc()) {
+                $codigosNotif[$r['id_pedido']][] = $r;
+            }
+            $stmtCN->close();
+        } catch (mysqli_sql_exception $e) {}
+    }
+
+    /* Datos para el tooltip del avatar (email + puntos) */
+    $headerUserInfo = ['email' => '', 'puntos' => 0];
+    try {
+        $stmtUI = $conn->prepare("SELECT email, puntos FROM usuarios WHERE id_usuario = ?");
+        $stmtUI->bind_param("i", $uid);
+        $stmtUI->execute();
+        $headerUserInfo = $stmtUI->get_result()->fetch_assoc() ?? $headerUserInfo;
+        $stmtUI->close();
+    } catch (Exception $e) {}
 }
 ?>
 <!DOCTYPE html>
@@ -58,6 +90,85 @@ if (is_logged_in()) {
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
   <link rel="stylesheet" href="style.css">
   <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+  <style>
+    /* ── Tooltips del sidebar ── */
+    .sidebar-icon[data-tooltip] { position: relative; }
+    .sidebar-icon[data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: calc(100% + 14px);
+      top: 50%;
+      transform: translateY(-50%) translateX(-6px);
+      background: #1a1a2e;
+      color: #fff;
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-size: .78rem;
+      font-weight: 600;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      border: 1px solid rgba(255,255,255,.12);
+      box-shadow: 0 4px 16px rgba(0,0,0,.4);
+      transition: opacity .18s ease, transform .18s ease;
+      z-index: 200;
+    }
+    .sidebar-icon[data-tooltip]:hover::after {
+      opacity: 1;
+      transform: translateY(-50%) translateX(0);
+    }
+
+    /* ── Tooltip / card de la cuenta en el header ── */
+    .user-card-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+    .user-card-wrap .user-hover-card {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      min-width: 200px;
+      background: #1a1a2e;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-6px);
+      transition: opacity .2s ease, transform .2s ease;
+      z-index: 500;
+      text-align: left;
+    }
+    .user-card-wrap:hover .user-hover-card {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+    .user-hover-card__name {
+      font-weight: 700;
+      font-size: .95rem;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .user-hover-card__email {
+      font-size: .78rem;
+      color: rgba(255,255,255,.55);
+      word-break: break-all;
+      margin-bottom: 10px;
+    }
+    .user-hover-card__pts {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .82rem;
+      font-weight: 600;
+      color: #a78bfa;
+      border-top: 1px solid rgba(255,255,255,.1);
+      padding-top: 8px;
+    }
+  </style>
 </head>
 <body>
 
@@ -109,12 +220,26 @@ if (is_logged_in()) {
       <a href="recompensaDiaria.php" title="Recompensa Diaria">
         <i class="fa-solid fa-gift" aria-hidden="true"></i>
       </a>
-      <!-- Avatar como enlace al perfil -->
-      <a href="perfil.php" class="site-header__user" title="Mi perfil">
-        <span class="user-avatar" aria-label="Perfil: <?= e($_SESSION['username'] ?? 'U') ?>">
-          <?= strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1)) ?>
-        </span>
-      </a>
+      <!-- Avatar con hover card de cuenta -->
+      <div class="user-card-wrap">
+        <a href="perfil.php" class="site-header__user" title="Mi perfil">
+          <span class="user-avatar" aria-label="Perfil: <?= e($_SESSION['username'] ?? 'U') ?>">
+            <?= strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1)) ?>
+          </span>
+        </a>
+        <div class="user-hover-card" role="tooltip" aria-hidden="true">
+          <div class="user-hover-card__name">
+            <?= e($_SESSION['username'] ?? 'Usuario') ?>
+          </div>
+          <div class="user-hover-card__email">
+            <?= e($headerUserInfo['email'] ?? '') ?>
+          </div>
+          <div class="user-hover-card__pts">
+            <i class="fa-solid fa-star" style="color:#facc15;" aria-hidden="true"></i>
+            <?= number_format((int)($headerUserInfo['puntos'] ?? 0)) ?> puntos
+          </div>
+        </div>
+      </div><!-- /.user-card-wrap -->
       <a href="logout_ajax.php" title="Cerrar sesión">
         <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
       </a>
@@ -154,16 +279,16 @@ if (is_logged_in()) {
 <!-- ═══════════════════════════ SIDEBAR ═══════════════════════════ -->
 <aside class="sidebar" aria-label="Navegación lateral">
 
-  <a href="index.php" class="sidebar-icon" title="Inicio" aria-label="Inicio">
+  <a href="index.php" class="sidebar-icon" title="Inicio" data-tooltip="Inicio" aria-label="Inicio">
     <i class="fa-solid fa-house"></i>
   </a>
-  <a href="productos.php" class="sidebar-icon" title="Juegos" aria-label="Catálogo">
+  <a href="productos.php" class="sidebar-icon" title="Juegos" data-tooltip="Juegos" aria-label="Catálogo">
     <i class="fa-solid fa-gamepad"></i>
   </a>
-  <a href="combos.php" class="sidebar-icon" title="Combos" aria-label="Combos">
+  <a href="combos.php" class="sidebar-icon" title="Combos" data-tooltip="Combos" aria-label="Combos">
     <i class="fa-solid fa-layer-group"></i>
   </a>
-  <a href="carrito.php" class="sidebar-icon" title="Carrito" aria-label="Carrito" id="sidebarCartLink">
+  <a href="carrito.php" class="sidebar-icon" title="Carrito" data-tooltip="Carrito" aria-label="Carrito" id="sidebarCartLink">
     <i class="fa-solid fa-cart-shopping"></i>
     <?php if ($cartCount > 0): ?>
       <span class="cart-count-badge" id="cartBadge"><?= $cartCount ?></span>
@@ -173,10 +298,10 @@ if (is_logged_in()) {
   </a>
 
   <?php if (is_logged_in()): ?>
-    <a href="recompensaDiaria.php" class="sidebar-icon" title="Recompensa Diaria" aria-label="Recompensa">
+    <a href="recompensaDiaria.php" class="sidebar-icon" title="Recompensa Diaria" data-tooltip="Recompensa" aria-label="Recompensa">
       <i class="fa-solid fa-gift"></i>
     </a>
-    <a href="perfil.php" class="sidebar-icon" title="Mi Perfil" aria-label="Perfil">
+    <a href="perfil.php" class="sidebar-icon" title="Mi Perfil" data-tooltip="Mi Perfil" aria-label="Perfil">
       <i class="fa-solid fa-user"></i>
     </a>
   <?php endif; ?>
@@ -186,7 +311,7 @@ if (is_logged_in()) {
 
   <!-- ── Icono de notificaciones ── -->
   <button class="sidebar-icon sidebar-notif-btn" id="notifBtn"
-          title="Notificaciones" aria-label="Ver notificaciones"
+          title="Notificaciones" data-tooltip="Notificaciones" aria-label="Ver notificaciones"
           aria-expanded="false" aria-controls="notifPanel">
     <i class="fa-solid fa-bell"></i>
     <?php if (!empty($notifCount) && $notifCount > 0): ?>
@@ -229,22 +354,69 @@ if (is_logged_in()) {
     <?php else: ?>
       <!-- Logueado con pedidos -->
       <ul class="notif-list">
-        <?php foreach ($pedidosRecientes as $ped): ?>
-          <li class="notif-item">
-            <div class="notif-item__icon">
-              <i class="fa-solid fa-<?= $ped['estado'] === 'pagado' ? 'circle-check' : 'clock' ?>"
-                 style="color:var(--clr-<?= $ped['estado'] === 'pagado' ? 'success' : 'warning' ?>);"></i>
-            </div>
-            <div class="notif-item__body">
-              <span class="notif-item__title">Pedido #<?= (int)$ped['id_pedido'] ?></span>
-              <span class="notif-item__meta">
-                $<?= number_format((float)$ped['total'], 2) ?> —
-                <span style="color:var(--clr-<?= $ped['estado'] === 'pagado' ? 'success' : 'warning' ?>);">
-                  <?= ucfirst(e($ped['estado'])) ?>
+        <?php foreach ($pedidosRecientes as $ped):
+          $pedId   = (int)$ped['id_pedido'];
+          $hasCods = !empty($codigosNotif[$pedId]);
+        ?>
+          <li class="notif-item" style="flex-direction:column;align-items:flex-start;gap:6px;">
+            <div style="display:flex;align-items:center;gap:10px;width:100%;">
+              <div class="notif-item__icon">
+                <i class="fa-solid fa-<?= $ped['estado'] === 'pagado' ? 'circle-check' : 'clock' ?>"
+                   style="color:var(--clr-<?= $ped['estado'] === 'pagado' ? 'success' : 'warning' ?>);"></i>
+              </div>
+              <div class="notif-item__body" style="flex:1;">
+                <span class="notif-item__title">Pedido #<?= $pedId ?></span>
+                <span class="notif-item__meta">
+                  $<?= number_format((float)$ped['total'], 2) ?> —
+                  <span style="color:var(--clr-<?= $ped['estado'] === 'pagado' ? 'success' : 'warning' ?>);">
+                    <?= ucfirst(e($ped['estado'])) ?>
+                  </span>
                 </span>
-              </span>
-              <span class="notif-item__date"><?= date('d/m/Y', strtotime($ped['fecha'])) ?></span>
+                <span class="notif-item__date"><?= date('d/m/Y', strtotime($ped['fecha'])) ?></span>
+              </div>
+              <?php if ($hasCods): ?>
+                <button type="button"
+                        class="notif-detalle-btn"
+                        data-pedido="<?= $pedId ?>"
+                        aria-expanded="false"
+                        style="background:none;border:1px solid var(--clr-border);border-radius:6px;
+                               padding:4px 8px;font-size:.75rem;color:var(--clr-text-muted);
+                               cursor:pointer;white-space:nowrap;flex-shrink:0;">
+                  <i class="fa-solid fa-eye" aria-hidden="true"></i> Ver
+                </button>
+              <?php endif; ?>
             </div>
+
+            <?php if ($hasCods): ?>
+              <!-- Detalle expandible de códigos -->
+              <div id="notif-det-<?= $pedId ?>"
+                   style="display:none;width:100%;padding-left:34px;">
+                <ul style="list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;">
+                  <?php foreach ($codigosNotif[$pedId] as $cod):
+                    $fmt = implode('-', str_split($cod['codigo'], 4));
+                  ?>
+                    <li style="background:var(--clr-surface-2);border-radius:8px;padding:8px 10px;">
+                      <div style="font-size:.78rem;color:var(--clr-text-muted);margin-bottom:3px;">
+                        <?= e($cod['nombre_producto']) ?>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-family:monospace;color:var(--clr-neon);font-size:.85rem;letter-spacing:.5px;">
+                          <?= e($fmt) ?>
+                        </span>
+                        <button type="button"
+                                data-raw="<?= e($cod['codigo']) ?>"
+                                class="notif-copy-btn"
+                                style="background:none;border:none;cursor:pointer;
+                                       color:var(--clr-text-muted);font-size:.75rem;padding:0;"
+                                title="Copiar código">
+                          <i class="fa-solid fa-copy" aria-hidden="true"></i>
+                        </button>
+                      </div>
+                    </li>
+                  <?php endforeach; ?>
+                </ul>
+              </div>
+            <?php endif; ?>
           </li>
         <?php endforeach; ?>
       </ul>

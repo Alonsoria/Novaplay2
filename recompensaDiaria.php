@@ -84,8 +84,9 @@ $consecutiveYest  = ($userData['ultima_recompensa'] ?? '') === $ayer;
  *   locked     → aún no disponible
  */
 if ($claimed) {
-    /* Hoy ya fue reclamado: días 1…rachaActual = claimed, resto locked */
-    $diaDestacado = $rachaActual;
+    /* Hoy ya fue reclamado: días 1…rachaActual = claimed, resto locked.
+       Si racha_recompensa es 0 por estado inconsistente en BD, se usa 1. */
+    $diaDestacado = max(1, (int)$rachaActual);
 } elseif ($consecutiveYest && $rachaActual > 0) {
     /* Se puede reclamar hoy (continuación de racha) */
     $diaDestacado = ($rachaActual >= 7) ? 1 : $rachaActual + 1;
@@ -93,6 +94,9 @@ if ($claimed) {
     /* Primera vez o racha rota: el día disponible es el 1 */
     $diaDestacado = 1;
 }
+
+/* Clamp defensivo: garantiza índice válido [1..7] sin importar el estado de la BD */
+$diaDestacado = max(1, min(7, $diaDestacado));
 
 /* Puntos que se ganarían hoy si no se ha reclamado */
 $ptsHoy = $puntosXDia[$diaDestacado - 1];

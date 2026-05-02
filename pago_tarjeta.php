@@ -436,16 +436,22 @@ if (!empty($_SESSION['pago_error'])) {
     }
   }
 
-  /* ── Prevenir submit doble ── */
+  /* ── Prevenir submit doble y corregir CVV duplicado ── */
   document.getElementById('paymentForm').addEventListener('submit', function (e) {
-    /* Si es tarjeta guardada, sincronizar el campo CVV activo */
     const cardId = savedCardHid.value;
-    if (cardId !== '0' && savedCvvInput) {
-      /* El campo con name="card_cvv" visible es el del saved-card-cvv-wrap;
-         pero si newCardFields está oculto, el input con id="card_cvv" también
-         está oculto y su required podría fallar. Eliminar required del oculto. */
-      if (cvvInput) cvvInput.removeAttribute('required');
+
+    if (cardId !== '0') {
+      /* Tarjeta guardada: deshabilitar campos de nueva tarjeta para que no
+         envíen valores al servidor (evita que el CVV vacío de nueva tarjeta
+         sobreescriba el CVV ingresado para la tarjeta guardada). */
+      if (cvvInput)    { cvvInput.removeAttribute('required'); cvvInput.disabled = true; }
+      if (numInput)    numInput.disabled    = true;
+      if (expiryInput) expiryInput.disabled = true;
       if (savedCvvInput) savedCvvInput.setAttribute('required', '');
+    } else {
+      /* Nueva tarjeta: deshabilitar el CVV de tarjeta guardada (está oculto
+         pero tiene el mismo name="card_cvv" → PHP usaría su valor vacío). */
+      if (savedCvvInput) savedCvvInput.disabled = true;
     }
 
     const btn = document.getElementById('payBtn');

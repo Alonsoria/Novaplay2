@@ -117,6 +117,27 @@ $stmtCnt->execute();
 $totalPedidos = (int)($stmtCnt->get_result()->fetch_assoc()['c'] ?? 0);
 $stmtCnt->close();
 
+/* ── Códigos de activación agrupados por pedido ── */
+$codigosPorPedido = [];
+if (!empty($pedidos)) {
+    $idsPedidos   = array_column($pedidos, 'id_pedido');
+    $placeholders = implode(',', array_fill(0, count($idsPedidos), '?'));
+    $types        = str_repeat('i', count($idsPedidos));
+    $stmtCod      = $conn->prepare(
+        "SELECT id_pedido, nombre_producto, codigo
+         FROM codigos_activacion
+         WHERE id_pedido IN ($placeholders)
+         ORDER BY id"
+    );
+    $stmtCod->bind_param($types, ...$idsPedidos);
+    $stmtCod->execute();
+    $resCod = $stmtCod->get_result();
+    while ($row = $resCod->fetch_assoc()) {
+        $codigosPorPedido[$row['id_pedido']][] = $row;
+    }
+    $stmtCod->close();
+}
+
 /* ── Tarjetas guardadas ── */
 $tarjetas = [];
 try {
@@ -297,17 +318,20 @@ try {
                 <th scope="col">Total</th>
                 <th scope="col">Estado</th>
                 <th scope="col">Fecha</th>
+                <th scope="col">Detalle</th>
               </tr>
             </thead>
             <tbody>
               <?php
-              /* Los pedidos vienen DESC (más nuevo primero), el más reciente
-                 recibe el número más alto (= totalPedidos), el más antiguo = 1 */
-              $numActual = min($totalPedidos, count($pedidos) + 0);
+              /* $numActual se usa como display (#1, #2…). Se captura ANTES
+                 del decremento para pasarlo al modal y mantener consistencia. */
+              $numActual = min($totalPedidos, count($pedidos));
               foreach ($pedidos as $ped):
+                $pidInt     = (int)$ped['id_pedido'];
+                $numDisplay = $numActual--;   /* captura y luego decrementa */
               ?>
                 <tr>
-                  <td>#<?= $numActual-- ?></td>
+                  <td>#<?= $numDisplay ?></td>
                   <td>$<?= number_format((float)$ped['total'], 2) ?></td>
                   <td>
                     <span style="color:var(--clr-<?= $ped['estado'] === 'pagado' ? 'success' : ($ped['estado'] === 'cancelado' ? 'danger' : 'warning') ?>);">
@@ -316,6 +340,21 @@ try {
                   </td>
                   <td style="color:var(--clr-text-muted);font-size:.85rem;">
                     <?= date('d/m/Y H:i', strtotime($ped['fecha'])) ?>
+                  </td>
+                  <td>
+                    <?php if (!empty($codigosPorPedido[$pidInt])): ?>
+                      <button type="button"
+                              class="btn-ver-detalle"
+                              data-pedido="<?= $pidInt ?>"
+                              data-numero="<?= $numDisplay ?>"
+                              style="background:linear-gradient(135deg,var(--clr-accent),var(--clr-accent-2));
+                                     border:none;border-radius:6px;padding:5px 10px;
+                                     color:#fff;font-size:.8rem;cursor:pointer;white-space:nowrap;">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i> Ver
+                      </button>
+                    <?php else: ?>
+                      <span style="color:var(--clr-border);font-size:.85rem;">—</span>
+                    <?php endif; ?>
                   </td>
                 </tr>
               <?php endforeach; ?>
@@ -349,6 +388,32 @@ try {
   </div>
   <?php endif; ?>
 
+  <!-- ── Modal: detalle de pedido ── -->
+  <div id="modal-detalle-pedido"
+       role="dialog" aria-modal="true" aria-labelledby="modal-ped-titulo"
+       style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);
+              z-index:10000;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:var(--clr-surface);border-radius:16px;padding:28px 28px 24px;
+                max-width:580px;width:100%;max-height:82vh;overflow-y:auto;
+                position:relative;box-shadow:0 0 50px rgba(0,0,0,.6);">
+
+      <button onclick="cerrarModalDetalle()"
+              aria-label="Cerrar"
+              style="position:absolute;top:14px;right:18px;background:none;border:none;
+                     color:var(--clr-text-muted);font-size:1.4rem;cursor:pointer;line-height:1;">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <h3 id="modal-ped-titulo"
+          style="margin-bottom:20px;color:var(--clr-white);font-family:var(--font-display);font-size:1.2rem;">
+        <i class="fa-solid fa-box" style="color:var(--clr-accent);margin-right:8px;" aria-hidden="true"></i>
+        Detalle del Pedido
+      </h3>
+
+      <div id="modal-detalle-body"></div>
+    </div>
+  </div>
+
 </main>
 
 <script>
@@ -374,6 +439,84 @@ try {
   if (window.location.hash === '#pedidos') {
     document.querySelector('[data-tab="pedidos"]')?.click();
   }
+})();
+
+/* ── Modal detalle de pedido ── */
+(function () {
+  const _codigos = <?= json_encode($codigosPorPedido, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+  const modal    = document.getElementById('modal-detalle-pedido');
+  const body     = document.getElementById('modal-detalle-body');
+  const titulo   = document.getElementById('modal-ped-titulo');
+
+  document.querySelectorAll('.btn-ver-detalle').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const pedId     = parseInt(btn.dataset.pedido, 10);
+      /* data-numero = número relativo del usuario (consistente con la tabla) */
+      const numDisplay = btn.dataset.numero || pedId;
+      const lista      = _codigos[pedId] || [];
+
+      titulo.innerHTML =
+        '<i class="fa-solid fa-box" style="color:var(--clr-accent);margin-right:8px;" aria-hidden="true"></i>' +
+        'Detalle del Pedido #' + numDisplay;
+
+      if (lista.length === 0) {
+        body.innerHTML = '<p style="color:var(--clr-text-muted);">No hay códigos registrados para este pedido.</p>';
+      } else {
+        let html = '<ul style="list-style:none;display:flex;flex-direction:column;gap:12px;margin:0;padding:0;">';
+        lista.forEach(function (item) {
+          const fmt = item.codigo.replace(/(.{4})/g, '$1-').replace(/-$/, '');
+          html += '<li style="background:var(--clr-surface-2);border:1px solid var(--clr-border);' +
+                  'border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;">' +
+                  '<span style="font-weight:600;color:var(--clr-white);font-size:.95rem;">' +
+                  item.nombre_producto + '</span>' +
+                  '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+                  '<span style="font-family:monospace;color:var(--clr-neon);font-size:1rem;letter-spacing:1px;">' +
+                  fmt + '</span>' +
+                  '<button data-raw="' + item.codigo + '" class="btn-copiar-cod" title="Copiar código" ' +
+                  'style="background:none;border:1px solid var(--clr-border);border-radius:6px;' +
+                  'padding:4px 10px;cursor:pointer;color:var(--clr-text);font-size:.82rem;">' +
+                  '<i class="fa-solid fa-copy" aria-hidden="true"></i> Copiar</button>' +
+                  '</div></li>';
+        });
+        html += '</ul>';
+        body.innerHTML = html;
+
+        /* Copiar al portapapeles */
+        body.querySelectorAll('.btn-copiar-cod').forEach(function (b) {
+          b.addEventListener('click', function () {
+            navigator.clipboard.writeText(b.dataset.raw).then(function () {
+              b.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i> Copiado';
+              b.style.color = 'var(--clr-success)';
+              b.style.borderColor = 'var(--clr-success)';
+              setTimeout(function () {
+                b.innerHTML = '<i class="fa-solid fa-copy" aria-hidden="true"></i> Copiar';
+                b.style.color = '';
+                b.style.borderColor = '';
+              }, 2000);
+            });
+          });
+        });
+      }
+
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    });
+  });
+
+  window.cerrarModalDetalle = function () {
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+  };
+
+  /* Cerrar al hacer clic fuera del panel */
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) cerrarModalDetalle();
+  });
+
+  /* Cerrar con Escape */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && modal.style.display === 'flex') cerrarModalDetalle();
+  });
 })();
 </script>
 

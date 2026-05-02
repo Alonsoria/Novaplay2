@@ -162,6 +162,39 @@
   });
 })();
 
+/* ─── Ver detalle en panel de notificaciones ─── */
+(function () {
+  /* Toggle de la sección de códigos */
+  document.querySelectorAll('.notif-detalle-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation(); /* evita que cierre el panel */
+      const pedId  = btn.dataset.pedido;
+      const det    = document.getElementById('notif-det-' + pedId);
+      if (!det) return;
+      const open = det.style.display === 'none';
+      det.style.display = open ? 'block' : 'none';
+      btn.setAttribute('aria-expanded', open);
+      btn.innerHTML = open
+        ? '<i class="fa-solid fa-chevron-up" aria-hidden="true"></i> Cerrar'
+        : '<i class="fa-solid fa-eye" aria-hidden="true"></i> Ver';
+    });
+  });
+
+  /* Copiar código individual en el panel */
+  document.querySelectorAll('.notif-copy-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      const raw = btn.dataset.raw;
+      navigator.clipboard.writeText(raw).then(function () {
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i>';
+        btn.style.color = 'var(--clr-success)';
+        setTimeout(function () { btn.innerHTML = orig; btn.style.color = ''; }, 2000);
+      });
+    });
+  });
+})();
+
 /* ─── Splash en iconos del sidebar ─── */
 (function () {
   document.querySelectorAll('.sidebar-icon').forEach(function (icon) {

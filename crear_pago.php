@@ -18,12 +18,28 @@ $result = $conn->query(
      FROM carrito c JOIN productos p ON c.id_producto = p.id_producto
      WHERE c.id_usuario = $uid"
 );
-$total = (float)($result ? ($result->fetch_assoc()['total'] ?? 0) : 0);
+$totalBruto = (float)($result ? ($result->fetch_assoc()['total'] ?? 0) : 0);
 
-if ($total <= 0) {
+if ($totalBruto <= 0) {
     header('Location: carrito.php');
     exit;
 }
+
+/* ── Aplicar descuento de puntos (sesión) ── */
+$puntosUsados = 0;
+if (!empty($_SESSION['puntos_usados'])) {
+    $stmtPV = $conn->prepare("SELECT puntos FROM usuarios WHERE id_usuario = ?");
+    $stmtPV->bind_param("i", $uid);
+    $stmtPV->execute();
+    $puntosDisp = (int)($stmtPV->get_result()->fetch_assoc()['puntos'] ?? 0);
+    $stmtPV->close();
+
+    $puntosUsados = min((int)$_SESSION['puntos_usados'], $puntosDisp, (int)$totalBruto);
+}
+$total = max(0.01, $totalBruto - $puntosUsados);  /* PayPal requiere mínimo > 0 */
+
+/* Guardar puntos usados para deducirlos en capturar_pago.php */
+$_SESSION['puntos_usados_paypal'] = $puntosUsados;
 
 /* Obtener access token */
 $token = paypal_get_token();

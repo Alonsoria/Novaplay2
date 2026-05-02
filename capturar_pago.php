@@ -19,6 +19,7 @@ if (!$orderId || $orderId !== ($_SESSION['paypal_order_id'] ?? '')) {
     exit;
 }
 
+/* $total ya viene con el descuento de puntos aplicado desde crear_pago.php */
 $total = (float)($_SESSION['paypal_total'] ?? 0);
 
 /* Capturar la orden */
@@ -100,6 +101,16 @@ if ($mesBD !== $mesCurrent) {
     $stmtC->close();
 }
 
+/* ── Deducir puntos usados (guardados en sesión por crear_pago.php) ── */
+$puntosUsadosPP = (int)($_SESSION['puntos_usados_paypal'] ?? 0);
+if ($puntosUsadosPP > 0) {
+    $stmtDP = $conn->prepare("UPDATE usuarios SET puntos = GREATEST(0, puntos - ?) WHERE id_usuario = ?");
+    $stmtDP->bind_param("ii", $puntosUsadosPP, $uid);
+    $stmtDP->execute();
+    $stmtDP->close();
+    unset($_SESSION['puntos_usados'], $_SESSION['puntos_usados_paypal']);
+}
+
 /* Limpiar carrito */
 $conn->query("DELETE FROM carrito WHERE id_usuario = $uid");
 
@@ -114,6 +125,30 @@ try {
 
 /* Limpiar sesión de pago */
 unset($_SESSION['paypal_order_id'], $_SESSION['paypal_total']);
+
+/* ── Enviar correo de confirmación ── */
+try {
+    $stmtMail = $conn->prepare("SELECT email, nombre FROM usuarios WHERE id_usuario = ?");
+    $stmtMail->bind_param("i", $uid);
+    $stmtMail->execute();
+    $userMail = $stmtMail->get_result()->fetch_assoc();
+    $stmtMail->close();
+
+    if (!empty($userMail['email'])) {
+        $mailTo      = $userMail['email'];
+        $mailSubject = "=?UTF-8?B?" . base64_encode("Compra realizada con exito!") . "?=";
+        $mailBody    = "Hola " . $userMail['nombre'] . ",\n\n";
+        $mailBody   .= "Tus codigos se han generado con exito. Disfrutalos!\n\n";
+        foreach ($codigosCompra as $item) {
+            $mailBody .= $item['nombre'] . ': ' . $item['codigo'] . "\n";
+        }
+        $mailBody   .= "\n-- Novaplay.com.mx";
+        $mailHeaders  = "From: Novaplay <noreply@novaplay.com.mx>\r\n";
+        $mailHeaders .= "Reply-To: noreply@novaplay.com.mx\r\n";
+        $mailHeaders .= "Content-Type: text/plain; charset=UTF-8\r\n";
+        @mail($mailTo, $mailSubject, $mailBody, $mailHeaders);
+    }
+} catch (Exception $e) {}
 
 $_SESSION['pago_exitoso']   = true;
 $_SESSION['pago_cashback']  = $cashback;

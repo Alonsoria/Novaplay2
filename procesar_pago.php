@@ -90,12 +90,26 @@ $result = $conn->query(
      FROM carrito c JOIN productos p ON c.id_producto = p.id_producto
      WHERE c.id_usuario = $uid"
 );
-$total = (float)($result ? ($result->fetch_assoc()['total'] ?? 0) : 0);
+$totalBruto = (float)($result ? ($result->fetch_assoc()['total'] ?? 0) : 0);
 
-if ($total <= 0) {
+if ($totalBruto <= 0) {
     header('Location: carrito.php');
     exit;
 }
+
+/* ── Aplicar descuento de puntos (sesión) ── */
+$puntosUsados = 0;
+if (!empty($_SESSION['puntos_usados'])) {
+    /* Verificar que el usuario realmente tenga esos puntos */
+    $stmtPV = $conn->prepare("SELECT puntos FROM usuarios WHERE id_usuario = ?");
+    $stmtPV->bind_param("i", $uid);
+    $stmtPV->execute();
+    $puntosDisp = (int)($stmtPV->get_result()->fetch_assoc()['puntos'] ?? 0);
+    $stmtPV->close();
+
+    $puntosUsados = min((int)$_SESSION['puntos_usados'], $puntosDisp, (int)$totalBruto);
+}
+$total = max(0.0, $totalBruto - $puntosUsados);
 
 /* ── SANDBOX: siempre aprobar ── */
 $approved = true;
@@ -215,8 +229,41 @@ try {
     $stmtN->close();
 } catch (Exception $e) {}
 
-/* ── Limpiar carrito y redirigir ── */
+/* ── Deducir puntos usados de la cuenta del usuario ── */
+if ($puntosUsados > 0) {
+    $stmtDP = $conn->prepare("UPDATE usuarios SET puntos = GREATEST(0, puntos - ?) WHERE id_usuario = ?");
+    $stmtDP->bind_param("ii", $puntosUsados, $uid);
+    $stmtDP->execute();
+    $stmtDP->close();
+    unset($_SESSION['puntos_usados']);
+}
+
+/* ── Limpiar carrito ── */
 $conn->query("DELETE FROM carrito WHERE id_usuario = $uid");
+
+/* ── Enviar correo de confirmación ── */
+try {
+    $stmtMail = $conn->prepare("SELECT email, nombre FROM usuarios WHERE id_usuario = ?");
+    $stmtMail->bind_param("i", $uid);
+    $stmtMail->execute();
+    $userMail = $stmtMail->get_result()->fetch_assoc();
+    $stmtMail->close();
+
+    if (!empty($userMail['email'])) {
+        $mailTo      = $userMail['email'];
+        $mailSubject = "=?UTF-8?B?" . base64_encode("Compra realizada con exito!") . "?=";
+        $mailBody    = "Hola " . $userMail['nombre'] . ",\n\n";
+        $mailBody   .= "Tus codigos se han generado con exito. Disfrutalos!\n\n";
+        foreach ($codigosCompra as $item) {
+            $mailBody .= $item['nombre'] . ': ' . $item['codigo'] . "\n";
+        }
+        $mailBody   .= "\n-- Novaplay.com.mx";
+        $mailHeaders  = "From: Novaplay <noreply@novaplay.com.mx>\r\n";
+        $mailHeaders .= "Reply-To: noreply@novaplay.com.mx\r\n";
+        $mailHeaders .= "Content-Type: text/plain; charset=UTF-8\r\n";
+        @mail($mailTo, $mailSubject, $mailBody, $mailHeaders);
+    }
+} catch (Exception $e) {}
 
 $_SESSION['pago_exitoso']   = true;
 $_SESSION['pago_cashback']  = $cashback;
