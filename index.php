@@ -229,7 +229,7 @@ $subs = [
           <?php endif; ?>
 
           <button class="btn btn-add-cart mt-sm"
-                  data-id="<?= (int)$juego['id'] ?>"
+                  data-id="<?= (int)$juego['id_producto'] ?>"
                   data-name="<?= e($juego['nombre']) ?>"
                   style="margin-top:auto;">
             <i class="fa-solid fa-cart-plus" aria-hidden="true"></i>
@@ -401,7 +401,7 @@ $subs = [
           badge.textContent = data.cartCount;
           badge.classList.remove('d-none');
         }
-        btn.textContent = '✓ Añadido';
+        btn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i> Añadido';
         setTimeout(function () {
           btn.disabled    = false;
           btn.innerHTML   = '<i class="fa-solid fa-cart-plus" aria-hidden="true"></i> Añadir';

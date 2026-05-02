@@ -138,7 +138,7 @@ $plataformas = ['PlayStation', 'Xbox', 'Nintendo', 'PC'];
           <?php endif; ?>
 
           <button class="btn btn-add-cart mt-sm"
-                  data-id="<?= (int)$juego['id'] ?>"
+                  data-id="<?= (int)$juego['id_producto'] ?>"
                   data-name="<?= e($juego['nombre']) ?>"
                   style="margin-top:auto;">
             <i class="fa-solid fa-cart-plus" aria-hidden="true"></i>

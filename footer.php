@@ -95,6 +95,73 @@
   });
 })();
 
+/* ─── CARD-STACK — Transición suave entre tarjetas de suscripción ─── */
+(function () {
+  document.querySelectorAll('.card-stack').forEach(function (stack) {
+    let animating = false;
+
+    stack.addEventListener('click', function () {
+      if (animating) return;
+      const cards = Array.from(stack.querySelectorAll('.sub-card'));
+      if (cards.length < 2) return;
+
+      animating = true;
+      const top = cards[cards.length - 1];
+
+      top.classList.add('moving-back');
+
+      top.addEventListener('animationend', function () {
+        top.classList.remove('moving-back');
+
+        /* Activar transición en todas las cartas para el reordenado */
+        cards.forEach(c => c.classList.add('stack-smooth'));
+
+        /* Mover al fondo del DOM */
+        stack.insertBefore(top, cards[0]);
+
+        /* Limpiar clase de transición tras completar el movimiento */
+        const dur = parseFloat(getComputedStyle(top).transitionDuration) * 1000 || 300;
+        setTimeout(function () {
+          cards.forEach(c => c.classList.remove('stack-smooth'));
+          animating = false;
+        }, dur + 50);
+
+      }, { once: true });
+    });
+  });
+})();
+
+/* ─── Panel de notificaciones (sidebar) ─── */
+(function () {
+  const btn   = document.getElementById('notifBtn');
+  const panel = document.getElementById('notifPanel');
+  const close = document.getElementById('notifClose');
+  if (!btn || !panel) return;
+
+  btn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    const open = panel.classList.toggle('open');
+    btn.setAttribute('aria-expanded', open);
+    panel.setAttribute('aria-hidden', !open);
+  });
+
+  if (close) {
+    close.addEventListener('click', function () {
+      panel.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+      panel.setAttribute('aria-hidden', 'true');
+    });
+  }
+
+  document.addEventListener('click', function (e) {
+    if (!panel.contains(e.target) && e.target !== btn) {
+      panel.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+      panel.setAttribute('aria-hidden', 'true');
+    }
+  });
+})();
+
 /* ─── Splash en iconos del sidebar ─── */
 (function () {
   document.querySelectorAll('.sidebar-icon').forEach(function (icon) {

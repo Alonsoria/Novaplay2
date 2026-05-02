@@ -9,7 +9,7 @@ require_once 'header.php';
 ?>
 
 <div class="result-page" aria-label="Pago cancelado">
-  <div class="result-icon" aria-hidden="true">😔</div>
+  <div class="result-icon" aria-hidden="true"><i class="fa-solid fa-circle-xmark" style="color:var(--clr-warning);"></i></div>
   <h2 style="color:var(--clr-warning);">Pago Cancelado</h2>
   <p>Tu pago fue cancelado. Los productos siguen en tu carrito cuando quieras completar la compra.</p>
   <div style="display:flex;gap:var(--space-md);flex-wrap:wrap;justify-content:center;margin-top:var(--space-md);">
