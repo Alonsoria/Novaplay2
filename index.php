@@ -26,6 +26,8 @@ $heroSlides = [
         'rating'    => 5,
         'date'      => 'Disponible ahora',
         'link'      => 'productos.php?plataforma=Nintendo',
+        'bgOpacity' => '0.15',
+        'charStyle' => '',   
     ],
     [
         'title'     => 'Friday Night Funkin\'',
@@ -35,6 +37,8 @@ $heroSlides = [
         'rating'    => 4,
         'date'      => 'Disponible ahora',
         'link'      => 'productos.php',
+        'bgOpacity' => '0.15',
+        'charStyle' => '',   
     ],
     [
         'title'     => 'Halo Infinite',
@@ -44,6 +48,8 @@ $heroSlides = [
         'rating'    => 5,
         'date'      => 'Disponible ahora',
         'link'      => 'productos.php?plataforma=Xbox',
+        'bgOpacity' => '0.15',
+        'charStyle' => 'width:min(500px); right:250px; bottom:100px;',  // más pequeño y ajustado
     ],
 ];
 
@@ -93,10 +99,11 @@ $subs = [
 
   <!-- Fondo del slide actual -->
   <img src="<?= e($heroSlides[0]['img']) ?>"
-       alt=""
-       class="hero-bg-image"
-       id="heroBgImg"
-       aria-hidden="true">
+      alt=""
+      class="hero-bg-image"
+      id="heroBgImg"
+      style="opacity: <?= e($heroSlides[0]['bgOpacity']) ?>;"
+      aria-hidden="true">
 
   <!-- Contenido textual -->
   <div class="contenidoJuego" id="heroContent">
@@ -125,10 +132,11 @@ $subs = [
 
   <!-- Personaje decorativo -->
   <img src="<?= e($heroSlides[0]['character']) ?>"
-       alt=""
-       class="hero-character"
-       id="heroCharacter"
-       aria-hidden="true">
+      alt=""
+      class="hero-character"
+      id="heroCharacter"
+      style="<?= e($heroSlides[0]['charStyle']) ?>"
+      aria-hidden="true">
 
   <!-- Indicadores de slides -->
   <div class="hero-indicators" aria-label="Slides del hero" style="position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:5;">
@@ -286,8 +294,14 @@ $subs = [
       if (descEl)   descEl.textContent   = s.desc;
       if (dateEl)   dateEl.textContent   = s.date;
       if (linkEl)   linkEl.href          = s.link;
-      if (charEl)   charEl.src           = s.character;
-      if (bgEl)     bgEl.src             = s.img;
+      if (charEl) {
+          charEl.src = s.character;
+          charEl.style.cssText = s.charStyle || '';
+      }
+      if (bgEl) {
+          bgEl.src = s.img;
+          bgEl.style.opacity = s.bgOpacity || '0.15';
+      }
 
       /* Estrellas */
       if (starsEl) {
