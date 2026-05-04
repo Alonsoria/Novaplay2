@@ -29,8 +29,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (strlen($password) < 1) {
         $error = 'Introduce tu contraseña.';
     } else {
-        /* 4. Buscar usuario con nombres de columna correctos */
-        $stmt = $conn->prepare("SELECT id_usuario, nombre, contraseña FROM usuarios WHERE email = ?");
+        /* 4. Buscar usuario — incluye campo verificado */
+        $stmt = $conn->prepare(
+            "SELECT id_usuario, nombre, contraseña, verificado FROM usuarios WHERE email = ?"
+        );
         $stmt->bind_param("s", $email);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -38,6 +40,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->close();
 
         if ($user && password_verify($password, $user['contraseña'])) {
+            /* Verificar que la cuenta esté activada */
+            if (!(int)$user['verificado']) {
+                $_SESSION['pending_verify_email'] = $email;
+                header('Location: verificar.php');
+                exit;
+            }
             /* Sesión segura: regenerar ID antes de escribir datos */
             session_regenerate_id(true);
             $_SESSION['user_id']  = $user['id_usuario'];

@@ -8,6 +8,7 @@
 require_once 'security.php';
 require_once 'config.php';
 require_once 'paypal_helper.php';
+require_once 'mailer.php';
 
 require_login();
 
@@ -135,20 +136,18 @@ try {
     $stmtMail->close();
 
     if (!empty($userMail['email'])) {
-        $mailTo      = $userMail['email'];
-        $mailSubject = "=?UTF-8?B?" . base64_encode("Compra realizada con exito!") . "?=";
-        $mailBody    = "Hola " . $userMail['nombre'] . ",\n\n";
-        $mailBody   .= "Tus codigos se han generado con exito. Disfrutalos!\n\n";
+        $mailBody  = "Hola {$userMail['nombre']},\n\n";
+        $mailBody .= "Tus codigos se han generado con exito. Disfrutalos!\n\n";
         foreach ($codigosCompra as $item) {
             $mailBody .= $item['nombre'] . ': ' . $item['codigo'] . "\n";
         }
-        $mailBody   .= "\n-- Novaplay.com.mx";
-        $mailHeaders  = "From: Novaplay <noreply@novaplay.com.mx>\r\n";
-        $mailHeaders .= "Reply-To: noreply@novaplay.com.mx\r\n";
-        $mailHeaders .= "Content-Type: text/plain; charset=UTF-8\r\n";
-        @mail($mailTo, $mailSubject, $mailBody, $mailHeaders);
+        $mailBody .= "\n-- Novaplay.com.mx";
+
+        nova_send_mail($userMail['email'], "[{$userMail['nombre']} | {$userMail['email']}] Compra realizada con exito!", $mailBody);
     }
-} catch (Exception $e) {}
+} catch (Exception $e) {
+    error_log('[Novaplay] Error al enviar correo de compra (PayPal): ' . $e->getMessage());
+}
 
 $_SESSION['pago_exitoso']   = true;
 $_SESSION['pago_cashback']  = $cashback;
