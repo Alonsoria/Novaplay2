@@ -21,7 +21,7 @@ $heroSlides = [
     [
         'title'     => 'The Legend of Zelda: Tears of the Kingdom',
         'desc'      => 'Explora los cielos de Hyrule en la aventura más épica de Link.',
-        'img'       => './images/zelda-totk.png',
+        'img'       => './images/TOTKlogo.png',
         'character' => './images/zelda-char.png',
         'rating'    => 5,
         'date'      => 'Disponible ahora',
@@ -30,8 +30,8 @@ $heroSlides = [
     [
         'title'     => 'Friday Night Funkin\'',
         'desc'      => 'El juego de ritmo indie que conquistó internet. ¡Demuestra tu flow!',
-        'img'       => './images/fnf.png',
-        'character' => './images/fnf-char.png',
+        'img'       => './images/fnf-char.png',
+        'character' => './images/BfPng2k.png',
         'rating'    => 4,
         'date'      => 'Disponible ahora',
         'link'      => 'productos.php',
@@ -39,8 +39,8 @@ $heroSlides = [
     [
         'title'     => 'Halo Infinite',
         'desc'      => 'El Jefe Maestro regresa. La leyenda continúa en el universo expandido de Halo.',
-        'img'       => './images/halo.png',
-        'character' => './images/halo-char.png',
+        'img'       => './images/HaloLogo.png',
+        'character' => './images/HaloPng.png',
         'rating'    => 5,
         'date'      => 'Disponible ahora',
         'link'      => 'productos.php?plataforma=Xbox',

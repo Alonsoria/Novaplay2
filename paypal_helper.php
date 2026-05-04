@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__ . '/paypal_config.php';
+require_once __DIR__ . '/config.php';
 
 /**
  * Obtiene un access-token Bearer de PayPal usando client_credentials.

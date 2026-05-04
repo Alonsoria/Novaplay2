@@ -368,7 +368,7 @@ h2 {
 
 /* Padding para el body cuando el header es fixed */
 .page-wrapper {
-  padding-top: var(--header-h);
+  padding-top: 47px;
   padding-left: var(--sidebar-w);
 }
 
