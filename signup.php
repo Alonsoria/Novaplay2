@@ -1,71 +1,114 @@
 <?php
 /**
  * NOVAPLAY — SIGNUP.PHP
- * Registro de usuarios con CSRF, validación y password_hash.
+ * Registro de usuarios con CSRF, honeypot, rate limiting por IP,
+ * validación completa y verificación de cuenta por correo.
  */
 
 require_once 'security.php';
 require_once 'config.php';
+require_once 'mailer.php';
 
 if (is_logged_in()) {
     header('Location: index.php');
     exit;
 }
 
-$error   = '';
-$success = '';
+$error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
 
-    $username  = clean_str($_POST['username'] ?? '');
-    $email     = clean_email($_POST['email'] ?? '');
-    $password  = $_POST['password'] ?? '';
-    $password2 = $_POST['password2'] ?? '';
+    /* ── Honeypot anti-bot: campo oculto que humanos dejan vacío ── */
+    if (!empty($_POST['hp_website'])) {
+        /* Bot detectado: redirigir silenciosamente como si fuera éxito */
+        header('Location: verificar.php');
+        exit;
+    }
 
-    /* Validaciones */
-    if (strlen($username) < 3 || strlen($username) > 30) {
-        $error = 'El nombre de usuario debe tener entre 3 y 30 caracteres.';
-    } elseif (!preg_match('/^[a-zA-Z0-9_]+$/', $username)) {
-        $error = 'El nombre de usuario solo puede contener letras, números y guiones bajos.';
-    } elseif (!$email) {
-        $error = 'Introduce un correo electrónico válido.';
-    } elseif (strlen($password) < 8) {
-        $error = 'La contraseña debe tener al menos 8 caracteres.';
-    } elseif ($password !== $password2) {
-        $error = 'Las contraseñas no coinciden.';
+    /* ── Rate limiting: máx 5 registros por IP en 60 minutos ── */
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    /* Limpiar intentos viejos (más de 1 hora) */
+    $conn->query("DELETE FROM registro_intentos WHERE creado < DATE_SUB(NOW(), INTERVAL 1 HOUR)");
+    $stmtIP = $conn->prepare("SELECT COUNT(*) FROM registro_intentos WHERE ip = ?");
+    $stmtIP->bind_param("s", $ip);
+    $stmtIP->execute();
+    $stmtIP->bind_result($intentos);
+    $stmtIP->fetch();
+    $stmtIP->close();
+
+    if ($intentos >= 5) {
+        $error = 'Demasiados intentos de registro. Espera 1 hora e inténtalo de nuevo.';
     } else {
-        /* Verificar si el email ya existe */
-        $stmt = $conn->prepare("SELECT id_usuario FROM usuarios WHERE email = ?");
-        $stmt->bind_param("s", $email);
-        $stmt->execute();
-        $stmt->store_result();
+        $username  = clean_str($_POST['username'] ?? '');
+        $email     = clean_email($_POST['email'] ?? '');
+        $password  = $_POST['password'] ?? '';
+        $password2 = $_POST['password2'] ?? '';
 
-        if ($stmt->num_rows > 0) {
-            $error = 'Este correo ya está registrado.';
+        /* ── Validaciones de campos ── */
+        if (strlen($username) < 3 || strlen($username) > 30) {
+            $error = 'El nombre de usuario debe tener entre 3 y 30 caracteres.';
+        } elseif (!preg_match('/^[a-zA-Z0-9_]+$/', $username)) {
+            $error = 'El nombre de usuario solo puede contener letras, números y guiones bajos.';
+        } elseif (!$email) {
+            $error = 'Introduce un correo electrónico válido.';
+        } elseif (strlen($password) < 8) {
+            $error = 'La contraseña debe tener al menos 8 caracteres.';
+        } elseif ($password !== $password2) {
+            $error = 'Las contraseñas no coinciden.';
         } else {
-            $stmt->close();
+            /* ── Verificar duplicado de correo ── */
+            $stmtChk = $conn->prepare("SELECT id_usuario FROM usuarios WHERE email = ?");
+            $stmtChk->bind_param("s", $email);
+            $stmtChk->execute();
+            $stmtChk->store_result();
+            $exists = $stmtChk->num_rows > 0;
+            $stmtChk->close();
 
-            /* Hash seguro de la contraseña */
-            $hashed = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
-
-            /* Insertar usuario con nombres de columnas correctos */
-            $stmt2 = $conn->prepare("INSERT INTO usuarios (nombre, email, contraseña) VALUES (?, ?, ?)");
-            $stmt2->bind_param("sss", $username, $email, $hashed);
-
-            if ($stmt2->execute()) {
-                session_regenerate_id(true);
-                $_SESSION['user_id']  = $stmt2->insert_id;
-                $_SESSION['username'] = $username;
-                header('Location: index.php');
-                exit;
+            if ($exists) {
+                $error = 'Este correo ya está registrado.';
             } else {
-                $error = 'Error al crear la cuenta. Intenta de nuevo.';
-            }
-            $stmt2->close();
-        }
+                /* ── Crear usuario con estado no verificado ── */
+                $hashed  = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
+                $code    = nova_gen_verification_code();
+                $expires = date('Y-m-d H:i:s', strtotime('+15 minutes'));
 
-        if (isset($stmt) && $stmt->errno === 0) $stmt->close();
+                $stmtIns = $conn->prepare(
+                    "INSERT INTO usuarios
+                        (nombre, email, contraseña, verificado, verification_code, verification_expires)
+                     VALUES (?, ?, ?, 0, ?, ?)"
+                );
+                $stmtIns->bind_param("sssss", $username, $email, $hashed, $code, $expires);
+
+                if ($stmtIns->execute()) {
+                    /* ── Registrar intento de IP ── */
+                    $stmtLog = $conn->prepare("INSERT INTO registro_intentos (ip) VALUES (?)");
+                    $stmtLog->bind_param("s", $ip);
+                    $stmtLog->execute();
+                    $stmtLog->close();
+
+                    /* ── Enviar correo de verificación ── */
+                    $mailBody  = "Hola $username,\n\n";
+                    $mailBody .= "Gracias por registrarte en Novaplay.\n\n";
+                    $mailBody .= "Para activar tu cuenta, copia y pega el siguiente código en la plataforma:\n\n";
+                    $mailBody .= "    $code\n\n";
+                    $mailBody .= "Este código expira en 15 minutos.\n";
+                    $mailBody .= "Si no creaste esta cuenta, ignora este mensaje.\n\n";
+                    $mailBody .= "-- Novaplay.com.mx";
+
+                    nova_send_mail($email, "[$username | $email] Confirma tu cuenta - Novaplay", $mailBody);
+
+                    /* ── Guardar email en sesión para la vista de verificación ── */
+                    $_SESSION['pending_verify_email'] = $email;
+
+                    header('Location: verificar.php');
+                    exit;
+                } else {
+                    $error = 'Error al crear la cuenta. Intenta de nuevo.';
+                }
+                $stmtIns->close();
+            }
+        }
     }
 }
 ?>
@@ -101,6 +144,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <form method="POST" action="signup.php" novalidate id="signupForm">
       <?= csrf_field() ?>
+
+      <!-- Honeypot anti-bot: oculto para humanos, los bots lo llenan -->
+      <div style="display:none;" aria-hidden="true">
+        <input type="text" name="hp_website" value="" tabindex="-1" autocomplete="off">
+      </div>
 
       <div class="form-group">
         <label for="username">Nombre de usuario</label>

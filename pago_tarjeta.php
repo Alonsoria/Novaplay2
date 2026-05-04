@@ -215,7 +215,7 @@ if (!empty($_SESSION['pago_error'])) {
                      class="form-control"
                      placeholder="•••"
                      required
-                     maxlength="4"
+                     maxlength="3"
                      inputmode="numeric"
                      autocomplete="cc-csc">
             </div>
