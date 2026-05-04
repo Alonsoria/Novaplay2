@@ -52,7 +52,7 @@ $heroSlides = [
         'link'      => 'productos.php?plataforma=Xbox',
         'bgOpacity' => '0.15',
         'bgStyle'   => 'object-fit: contain; width: 60%; left: 50%; transform: translateX(-50%);',
-        'charStyle' => 'width:min(500px); right:250px; bottom:100px;',  // más pequeño y ajustado
+        'charStyle' => 'width:min(550px); right:250px; bottom:100px;',  // más pequeño y ajustado
     ],
 ];
 
@@ -289,50 +289,57 @@ $subs = [
   const dots     = document.querySelectorAll('.hero-dot');
 
   function setSlide(idx) {
-    const s = slides[idx];
-    [titleEl, descEl, dateEl, charEl].forEach(el => { if (el) el.style.opacity = '0'; });
-    if (bgEl) {
-        bgEl.src = s.img;
-        bgEl.style.opacity = s.bgOpacity || '0.15';
-        bgEl.style.cssText = (s.bgStyle || '') + '; opacity:' + (s.bgOpacity || '0.15') + '; transition: opacity var(--trans-slow);';
-    }
-    
-    setTimeout(function () {
-      if (titleEl)  titleEl.textContent  = s.title;
-      if (descEl)   descEl.textContent   = s.desc;
-      if (dateEl)   dateEl.textContent   = s.date;
-      if (linkEl)   linkEl.href          = s.link;
-      if (charEl) {
-          charEl.src = s.character;
-          charEl.style.cssText = s.charStyle || '';
-      }
-      if (bgEl) {
-          bgEl.src = s.img;
-          bgEl.style.opacity = s.bgOpacity || '0.15';
-      }
+      const s = slides[idx];
+      
+      // Fade OUT — personaje y bg juntos
+      [titleEl, descEl, dateEl, charEl].forEach(el => { if (el) el.style.opacity = '0'; });
+      if (bgEl) bgEl.style.opacity = '0';
 
-      /* Estrellas */
-      if (starsEl) {
-        starsEl.innerHTML = '';
-        for (let i = 0; i < 5; i++) {
-          const star = document.createElement('i');
-          star.className = 'fa-star ' + (i < s.rating ? 'fa-solid' : 'fa-regular');
-          star.setAttribute('aria-hidden', 'true');
-          starsEl.appendChild(star);
-        }
-      }
+      setTimeout(function () {
+          if (titleEl)  titleEl.textContent  = s.title;
+          if (descEl)   descEl.textContent   = s.desc;
+          if (dateEl)   dateEl.textContent   = s.date;
+          if (linkEl)   linkEl.href          = s.link;
 
-      [titleEl, descEl, dateEl, charEl].forEach(el => { if (el) el.style.opacity = '1'; });
-      if (bgEl) bgEl.style.opacity = s.bgOpacity || '0.15';
+          // Personaje
+          if (charEl) {
+              charEl.src = s.character;
+              charEl.style.cssText = (s.charStyle || '') + '; transition: opacity var(--trans-slow); opacity: 0;';
+          }
 
-      /* Dots */
-      dots.forEach(function (dot, i) {
-        const isActive = i === idx;
-        dot.style.width      = isActive ? '28px' : '10px';
-        dot.style.background = isActive ? 'var(--clr-accent)' : 'rgba(255,255,255,.3)';
-        dot.classList.toggle('active', isActive);
-      });
-    }, 300);
+          // Fondo — aplicar bgStyle sin tocar opacity aún
+          if (bgEl) {
+              bgEl.src = s.img;
+              bgEl.style.cssText = (s.bgStyle || '') + '; transition: opacity var(--trans-slow); opacity: 0;';
+          }
+
+          // Estrellas
+          if (starsEl) {
+              starsEl.innerHTML = '';
+              for (let i = 0; i < 5; i++) {
+                  const star = document.createElement('i');
+                  star.className = 'fa-star ' + (i < s.rating ? 'fa-solid' : 'fa-regular');
+                  star.setAttribute('aria-hidden', 'true');
+                  starsEl.appendChild(star);
+              }
+          }
+
+          // Dots
+          dots.forEach(function (dot, i) {
+              const isActive = i === idx;
+              dot.style.width      = isActive ? '28px' : '10px';
+              dot.style.background = isActive ? 'var(--clr-accent)' : 'rgba(255,255,255,.3)';
+              dot.classList.toggle('active', isActive);
+          });
+
+          // Fade IN — pequeño delay para que el src cargue primero
+          setTimeout(function () {
+              [titleEl, descEl, dateEl].forEach(el => { if (el) el.style.opacity = '1'; });
+              if (charEl) charEl.style.opacity = '1';
+              if (bgEl)   bgEl.style.opacity   = s.bgOpacity || '0.15';
+          }, 50);
+
+      }, 300); // espera el fade out antes de cambiar contenido
   }
 
   function nextSlide() {
