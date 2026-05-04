@@ -78,7 +78,7 @@
 
   /* Layout */
   --sidebar-w:    70px;
-  --header-h:     120px;
+  --header-h:     100px;
 }
 
 *, *::before, *::after {
@@ -171,7 +171,7 @@ h2 {
 }
 
 .site-header__logo img {
-  height: 120px;
+  height: 100px;
   width: auto;
   transition: opacity var(--trans-fast), transform var(--trans-fast);
   filter: drop-shadow(0 0 18px rgba(214,13,123,.6));
@@ -1948,7 +1948,7 @@ main > h2 {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: var(--space-2xl) var(--space-xl);
+  padding-bottom: var(--space-xl);
   gap: var(--space-lg);
 }
 
