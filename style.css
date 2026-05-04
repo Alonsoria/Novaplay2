@@ -478,8 +478,8 @@ h2 {
   height: 100%;
   object-fit: contain;
   object-position: center;
-  opacity: .15;
-  transition: opacity var(--trans-slow);
+/*   opacity: .15;
+ */  transition: opacity var(--trans-slow);
   pointer-events: none;
   z-index: 0;
 }

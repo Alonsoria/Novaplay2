@@ -27,6 +27,7 @@ $heroSlides = [
         'date'      => 'Disponible ahora',
         'link'      => 'productos.php?plataforma=Nintendo',
         'bgOpacity' => '0.15',
+        'bgStyle' => '',
         'charStyle' => '',   
     ],
     [
@@ -38,6 +39,7 @@ $heroSlides = [
         'date'      => 'Disponible ahora',
         'link'      => 'productos.php',
         'bgOpacity' => '0.15',
+        'bgStyle' => '',
         'charStyle' => '',   
     ],
     [
@@ -49,6 +51,7 @@ $heroSlides = [
         'date'      => 'Disponible ahora',
         'link'      => 'productos.php?plataforma=Xbox',
         'bgOpacity' => '0.15',
+        'bgStyle'   => 'object-fit: contain; width: 60%; left: 50%; transform: translateX(-50%);',
         'charStyle' => 'width:min(500px); right:250px; bottom:100px;',  // más pequeño y ajustado
     ],
 ];
@@ -287,8 +290,13 @@ $subs = [
 
   function setSlide(idx) {
     const s = slides[idx];
-    [titleEl, descEl, dateEl, charEl, bgEl].forEach(el => { if (el) el.style.opacity = '0'; });
-
+    [titleEl, descEl, dateEl, charEl].forEach(el => { if (el) el.style.opacity = '0'; });
+    if (bgEl) {
+        bgEl.src = s.img;
+        bgEl.style.opacity = s.bgOpacity || '0.15';
+        bgEl.style.cssText = (s.bgStyle || '') + '; opacity:' + (s.bgOpacity || '0.15') + '; transition: opacity var(--trans-slow);';
+    }
+    
     setTimeout(function () {
       if (titleEl)  titleEl.textContent  = s.title;
       if (descEl)   descEl.textContent   = s.desc;
@@ -314,7 +322,8 @@ $subs = [
         }
       }
 
-      [titleEl, descEl, dateEl, charEl, bgEl].forEach(el => { if (el) el.style.opacity = '1'; });
+      [titleEl, descEl, dateEl, charEl].forEach(el => { if (el) el.style.opacity = '1'; });
+      if (bgEl) bgEl.style.opacity = s.bgOpacity || '0.15';
 
       /* Dots */
       dots.forEach(function (dot, i) {
