@@ -46,12 +46,15 @@ if (!$item) {
 
 $newQty = (int)$item['cantidad'];
 
-if ($action === 'remove' || ($action === 'decrease' && $newQty <= 1)) {
+if ($action === 'remove') {
     $stmt2 = $conn->prepare("DELETE FROM carrito WHERE id = ? AND id_usuario = ?");
     $stmt2->bind_param("ii", $itemId, $uid);
     $stmt2->execute();
     $stmt2->close();
     $newQty = 0;
+} elseif ($action === 'decrease' && $newQty <= 1) {
+    /* Cantidad mínima alcanzada — no-op, devuelve qty actual sin tocar la BD */
+    $newQty = 1;
 } elseif ($action === 'increase') {
     $newQty++;
     $stmt2 = $conn->prepare("UPDATE carrito SET cantidad = ? WHERE id = ?");

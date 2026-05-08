@@ -319,6 +319,7 @@ try {
                 <th scope="col">Estado</th>
                 <th scope="col">Fecha</th>
                 <th scope="col">Detalle</th>
+                <th scope="col">Devolución</th>
               </tr>
             </thead>
             <tbody>
@@ -356,6 +357,21 @@ try {
                       <span style="color:var(--clr-border);font-size:.85rem;">—</span>
                     <?php endif; ?>
                   </td>
+                  <td>
+                    <?php if ($ped['estado'] === 'pagado'): ?>
+                      <button type="button"
+                              class="btn-devolver"
+                              data-pedido="<?= $pidInt ?>"
+                              data-numero="<?= $numDisplay ?>"
+                              style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);
+                                     border-radius:6px;padding:5px 10px;color:var(--clr-warning);
+                                     font-size:.8rem;cursor:pointer;white-space:nowrap;">
+                        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Devolver
+                      </button>
+                    <?php else: ?>
+                      <span style="color:var(--clr-border);font-size:.85rem;">—</span>
+                    <?php endif; ?>
+                  </td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
@@ -387,6 +403,79 @@ try {
     </div>
   </div>
   <?php endif; ?>
+
+  <!-- ── Modal: solicitar devolución ── -->
+  <div id="modal-devolucion"
+       role="dialog" aria-modal="true" aria-labelledby="dev-titulo"
+       style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);
+              z-index:10001;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:var(--clr-surface);border-radius:16px;padding:28px;
+                max-width:520px;width:100%;max-height:85vh;overflow-y:auto;
+                position:relative;box-shadow:0 0 50px rgba(0,0,0,.6);">
+
+      <button onclick="cerrarModalDevolucion()"
+              aria-label="Cerrar"
+              style="position:absolute;top:14px;right:18px;background:none;border:none;
+                     color:var(--clr-text-muted);font-size:1.4rem;cursor:pointer;line-height:1;">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <h3 id="dev-titulo"
+          style="margin-bottom:4px;font-family:var(--font-display);font-size:1.15rem;color:var(--clr-white);">
+        <i class="fa-solid fa-rotate-left" style="color:var(--clr-warning);margin-right:8px;" aria-hidden="true"></i>
+        Solicitar devolución
+      </h3>
+      <p id="dev-pedido-ref" style="font-size:.85rem;color:var(--clr-text-muted);margin-bottom:20px;"></p>
+
+      <!-- Paso 1: selección de productos -->
+      <div id="dev-step1">
+        <p style="font-size:.9rem;color:var(--clr-text-muted);margin-bottom:14px;">
+          Selecciona los productos que deseas devolver:
+        </p>
+        <div id="dev-checkboxes" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;"></div>
+        <div style="display:flex;gap:10px;">
+          <button id="dev-btn-continuar"
+                  style="flex:1;background:linear-gradient(135deg,var(--clr-accent),var(--clr-accent-2));
+                         border:none;border-radius:8px;padding:10px;color:#fff;
+                         font-size:.9rem;cursor:pointer;font-weight:600;">
+            Continuar
+          </button>
+          <button onclick="cerrarModalDevolucion()"
+                  style="flex:1;background:var(--clr-surface-2);border:1px solid var(--clr-border);
+                         border-radius:8px;padding:10px;color:var(--clr-text);font-size:.9rem;cursor:pointer;">
+            Cancelar
+          </button>
+        </div>
+      </div>
+
+      <!-- Paso 2: confirmación -->
+      <div id="dev-step2" style="display:none;">
+        <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);
+                    border-radius:10px;padding:18px;margin-bottom:16px;text-align:center;">
+          <i class="fa-solid fa-circle-info"
+             style="font-size:2rem;color:var(--clr-warning);margin-bottom:10px;display:block;"
+             aria-hidden="true"></i>
+          <p style="color:var(--clr-white);font-size:.95rem;line-height:1.6;margin:0;">
+            Tu devolución será revisada y se te confirmará al correo registrado.
+          </p>
+        </div>
+        <div id="dev-resumen" style="margin-bottom:16px;font-size:.85rem;color:var(--clr-text-muted);"></div>
+        <div style="display:flex;gap:10px;">
+          <button id="dev-btn-confirmar"
+                  style="flex:1;background:var(--clr-success, #22c55e);border:none;border-radius:8px;
+                         padding:10px;color:#fff;font-size:.9rem;cursor:pointer;font-weight:600;">
+            <i class="fa-solid fa-check" aria-hidden="true"></i> Confirmar devolución
+          </button>
+          <button id="dev-btn-volver"
+                  style="flex:1;background:var(--clr-surface-2);border:1px solid var(--clr-border);
+                         border-radius:8px;padding:10px;color:var(--clr-text);font-size:.9rem;cursor:pointer;">
+            Volver
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
 
   <!-- ── Modal: detalle de pedido ── -->
   <div id="modal-detalle-pedido"
@@ -516,6 +605,137 @@ try {
   /* Cerrar con Escape */
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && modal.style.display === 'flex') cerrarModalDetalle();
+  });
+})();
+
+/* ── Modal de devolución ── */
+(function () {
+  const codigosDevol = <?= json_encode($codigosPorPedido, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+  const modalDev     = document.getElementById('modal-devolucion');
+  const step1        = document.getElementById('dev-step1');
+  const step2        = document.getElementById('dev-step2');
+  const checkboxesEl = document.getElementById('dev-checkboxes');
+  const pedidoRef    = document.getElementById('dev-pedido-ref');
+
+  let activePedidoId = null;
+  let selectedProds  = [];
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function abrir(pedidoId, numDisplay) {
+    activePedidoId       = pedidoId;
+    pedidoRef.textContent = 'Pedido #' + numDisplay;
+
+    const lista   = codigosDevol[pedidoId] || [];
+    const nombres = [...new Set(lista.map(function (i) { return i.nombre_producto; }))];
+    const itemStyle = 'display:flex;align-items:center;gap:10px;cursor:pointer;' +
+                      'background:var(--clr-surface-2);padding:10px 14px;border-radius:8px;' +
+                      'border:1px solid var(--clr-border);';
+    const cbStyle   = 'accent-color:var(--clr-accent);width:16px;height:16px;flex-shrink:0;';
+    const txtStyle  = 'color:var(--clr-white);font-size:.9rem;';
+
+    if (nombres.length === 0) {
+      checkboxesEl.innerHTML =
+        '<label style="' + itemStyle + '">' +
+        '<input type="checkbox" name="dev_prod" value="Pedido completo" checked style="' + cbStyle + '">' +
+        '<span style="' + txtStyle + '">Pedido completo</span></label>';
+    } else {
+      checkboxesEl.innerHTML = nombres.map(function (n) {
+        return '<label style="' + itemStyle + '">' +
+          '<input type="checkbox" name="dev_prod" value="' + escHtml(n) + '" style="' + cbStyle + '">' +
+          '<span style="' + txtStyle + '">' + escHtml(n) + '</span></label>';
+      }).join('');
+    }
+
+    step1.style.display = '';
+    step2.style.display = 'none';
+    modalDev.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+
+  document.getElementById('dev-btn-continuar').addEventListener('click', function () {
+    const checks = [...document.querySelectorAll('[name="dev_prod"]:checked')];
+    if (checks.length === 0) {
+      alert('Selecciona al menos un producto.');
+      return;
+    }
+    selectedProds = checks.map(function (c) { return c.value; });
+
+    const resumen = document.getElementById('dev-resumen');
+    resumen.innerHTML =
+      '<strong style="color:var(--clr-white);">Productos seleccionados:</strong>' +
+      '<ul style="margin:6px 0 0 18px;padding:0;">' +
+      selectedProds.map(function (p) {
+        return '<li style="color:var(--clr-text-muted);font-size:.85rem;margin-top:4px;">' + escHtml(p) + '</li>';
+      }).join('') + '</ul>';
+
+    step1.style.display = 'none';
+    step2.style.display = '';
+  });
+
+  document.getElementById('dev-btn-volver').addEventListener('click', function () {
+    step1.style.display = '';
+    step2.style.display = 'none';
+  });
+
+  document.getElementById('dev-btn-confirmar').addEventListener('click', function () {
+    const btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Enviando…';
+
+    fetch('solicitar_devolucion.php', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    'pedido_id=' + encodeURIComponent(activePedidoId) +
+               '&productos=' + encodeURIComponent(JSON.stringify(selectedProds)),
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.success) {
+        step2.innerHTML =
+          '<div style="text-align:center;padding:20px 0;">' +
+          '<i class="fa-solid fa-circle-check" style="font-size:3rem;color:var(--clr-success, #22c55e);' +
+          'margin-bottom:16px;display:block;" aria-hidden="true"></i>' +
+          '<p style="color:var(--clr-white);font-size:1rem;font-weight:600;margin-bottom:8px;">' +
+          '¡Solicitud registrada!</p>' +
+          '<p style="color:var(--clr-text-muted);font-size:.88rem;">' +
+          'Recibirás un correo de confirmación con los detalles de tu devolución.</p>' +
+          '</div>';
+        setTimeout(function () { cerrarModalDevolucion(); }, 3500);
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i> Confirmar devolución';
+        alert(data.error || 'Ocurrió un error. Intenta de nuevo.');
+      }
+    })
+    .catch(function () {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i> Confirmar devolución';
+      alert('Error de conexión. Intenta de nuevo.');
+    });
+  });
+
+  window.cerrarModalDevolucion = function () {
+    modalDev.style.display = 'none';
+    document.body.style.overflow = '';
+  };
+
+  modalDev.addEventListener('click', function (e) {
+    if (e.target === modalDev) cerrarModalDevolucion();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && modalDev.style.display === 'flex') cerrarModalDevolucion();
+  });
+
+  document.querySelectorAll('.btn-devolver').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      abrir(parseInt(btn.dataset.pedido, 10), btn.dataset.numero);
+    });
   });
 })();
 </script>

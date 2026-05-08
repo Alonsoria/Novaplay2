@@ -7,9 +7,9 @@
 $pageTitle = 'Inicio';
 require_once 'header.php';
 
-/* ── Productos destacados (query original sin modificar) ── */
+/* ── Productos destacados (excluye suscripciones) ── */
 $juegos = [];
-$result = $conn->query("SELECT * FROM productos LIMIT 8");
+$result = $conn->query("SELECT * FROM productos WHERE COALESCE(es_suscripcion, 0) = 0 LIMIT 8");
 if ($result) {
     while ($row = $result->fetch_assoc()) {
         $juegos[] = $row;
@@ -56,6 +56,15 @@ $heroSlides = [
     ],
 ];
 
+/* ── IDs de producto para cada plan de suscripción ── */
+$subProdIds = [];
+$resS = $conn->query("SELECT id_producto, TRIM(nombre) AS nombre FROM productos WHERE es_suscripcion = 1");
+if ($resS) {
+    while ($rowS = $resS->fetch_assoc()) {
+        $subProdIds[trim($rowS['nombre'])] = (int)$rowS['id_producto'];
+    }
+}
+
 /* ── Datos suscripciones ── */
 $subs = [
     [
@@ -91,6 +100,14 @@ $subs = [
         'btn_id'   => 'btnNintendo',
     ],
 ];
+
+/* Inyectar id_producto en cada plan según nombre exacto */
+foreach ($subs as &$sub) {
+    foreach ($sub['plans'] as &$plan) {
+        $plan['id_producto'] = $subProdIds[trim($plan['name'])] ?? null;
+    }
+}
+unset($sub, $plan);
 ?>
 
 <!-- ══════════════ HERO ══════════════ -->
@@ -179,6 +196,15 @@ $subs = [
           <button class="btn-sub <?= e($sub['btn_id']) ?>" data-plan="<?= e($plan['name']) ?>">
             <?= e($sub['btn_text']) ?>
           </button>
+          <?php if (!empty($plan['id_producto'])): ?>
+          <button class="btn btn-add-cart"
+                  data-id="<?= (int)$plan['id_producto'] ?>"
+                  data-name="<?= e(trim($plan['name'])) ?>"
+                  style="width:100%;margin-top:8px;font-size:.82rem;padding:8px 12px;">
+            <i class="fa-solid fa-cart-plus" aria-hidden="true"></i>
+            Agregar al carrito
+          </button>
+          <?php endif; ?>
         </div>
         <?php endforeach; ?>
       </div>
@@ -430,11 +456,19 @@ $subs = [
           badge.textContent = data.cartCount;
           badge.classList.remove('d-none');
         }
-        btn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i> Añadido';
-        setTimeout(function () {
-          btn.disabled    = false;
-          btn.innerHTML   = '<i class="fa-solid fa-cart-plus" aria-hidden="true"></i> Añadir';
-        }, 1800);
+        if (data.alreadyInCart) {
+          btn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i> Ya en carrito';
+          setTimeout(function () {
+            btn.disabled  = false;
+            btn.innerHTML = '<i class="fa-solid fa-cart-plus" aria-hidden="true"></i> Añadir';
+          }, 2000);
+        } else {
+          btn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i> Añadido';
+          setTimeout(function () {
+            btn.disabled  = false;
+            btn.innerHTML = '<i class="fa-solid fa-cart-plus" aria-hidden="true"></i> Añadir';
+          }, 1800);
+        }
       })
       .catch(function () {
         btn.disabled = false;

@@ -34,18 +34,18 @@ if (!$productoId || $productoId <= 0) {
 }
 
 /* Verificar que el producto existe */
-$stmt = $conn->prepare("SELECT id_producto FROM productos WHERE id_producto = ?");
+$stmt = $conn->prepare("SELECT id_producto, COALESCE(es_suscripcion, 0) AS es_suscripcion FROM productos WHERE id_producto = ?");
 $stmt->bind_param("i", $productoId);
 $stmt->execute();
-$stmt->store_result();
+$prod = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
-if ($stmt->num_rows === 0) {
+if (!$prod) {
     http_response_code(404);
     echo json_encode(['error' => 'Producto no encontrado']);
-    $stmt->close();
     exit;
 }
-$stmt->close();
+$esSuscripcion = (bool)$prod['es_suscripcion'];
 
 /* Verificar si ya está en el carrito (query original) */
 $stmt2 = $conn->prepare("SELECT id, cantidad FROM carrito WHERE id_usuario = ? AND id_producto = ?");
@@ -55,7 +55,17 @@ $res = $stmt2->get_result()->fetch_assoc();
 $stmt2->close();
 
 if ($res) {
-    /* Aumentar cantidad */
+    if ($esSuscripcion) {
+        /* Suscripciones: no permitir duplicados en el carrito */
+        $stmtCount = $conn->prepare("SELECT SUM(cantidad) AS total FROM carrito WHERE id_usuario = ?");
+        $stmtCount->bind_param("i", $uid);
+        $stmtCount->execute();
+        $cartCount = (int)($stmtCount->get_result()->fetch_assoc()['total'] ?? 0);
+        $stmtCount->close();
+        echo json_encode(['success' => false, 'alreadyInCart' => true, 'cartCount' => $cartCount]);
+        exit;
+    }
+    /* Aumentar cantidad para productos normales */
     $nuevaCantidad = (int)$res['cantidad'] + 1;
     $stmt3 = $conn->prepare("UPDATE carrito SET cantidad = ? WHERE id = ?");
     $stmt3->bind_param("ii", $nuevaCantidad, $res['id']);

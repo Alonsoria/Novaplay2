@@ -11,15 +11,15 @@ require_once __DIR__ . '/security.php';
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_USER', getenv('DB_USER') ?: 'root');
 define('DB_PASS', getenv('DB_PASS') ?: '');
-define('DB_NAME', getenv('DB_NAME') ?: 'novaplay3');
+define('DB_NAME', getenv('DB_NAME') ?: 'novaplay2');
 define('DB_CHARSET', 'utf8mb4');
-define('SITE_URL', getenv('SITE_URL') ?: 'http://localhost/Novaplay2/Novaplay2');
+define('SITE_URL', getenv('SITE_URL') ?: 'http://localhost/Novaplay2');
 
 /* ── Configuración SMTP ── */
 define('MAIL_HOST',      'sandbox.smtp.mailtrap.io');
 define('MAIL_PORT',      2525);
-define('MAIL_USER',      '6c60ef8887a087');
-define('MAIL_PASS',      'f8b9f80fca962a');
+define('MAIL_USER',      '13c3c3cfec37f1');
+define('MAIL_PASS',      '117747fde13ee1');
 define('MAIL_FROM',      'noreply@novaplay.com.mx');
 define('MAIL_FROM_NAME', 'Novaplay');
 

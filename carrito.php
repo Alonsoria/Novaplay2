@@ -51,10 +51,15 @@ require_once 'header.php';   /* security.php y config.php no se recargan (requir
 /* ── Cargar items del carrito ── */
 $items = [];
 $result = $conn->query(
-    "SELECT c.id, c.cantidad, p.id_producto AS producto_id, p.nombre, p.precio, p.imagen
+    "SELECT c.id, c.cantidad, p.id_producto AS producto_id, p.nombre, p.precio, p.imagen,
+            COALESCE(p.es_suscripcion, 0) AS es_suscripcion,
+            GROUP_CONCAT(pl.nombre ORDER BY pl.nombre SEPARATOR ', ') AS plataformas
      FROM carrito c
-     JOIN productos p ON c.id_producto = p.id_producto
-     WHERE c.id_usuario = $uid"
+     JOIN  productos p         ON c.id_producto   = p.id_producto
+     LEFT JOIN producto_plataforma pp ON p.id_producto   = pp.id_producto
+     LEFT JOIN plataformas pl         ON pp.id_plataforma = pl.id_plataforma
+     WHERE c.id_usuario = $uid
+     GROUP BY c.id, c.cantidad, p.id_producto, p.nombre, p.precio, p.imagen, p.es_suscripcion"
 );
 if ($result) {
     while ($row = $result->fetch_assoc()) {
@@ -122,7 +127,14 @@ if (!empty($_SESSION['pago_error'])) {
                     <?php if (!empty($item['imagen'])): ?>
                       <img src="<?= e($item['imagen']) ?>" alt="<?= e($item['nombre']) ?>">
                     <?php endif; ?>
-                    <span><?= e($item['nombre']) ?></span>
+                    <span>
+                      <?= e($item['nombre']) ?>
+                      <?php if ($item['es_suscripcion']): ?>
+                        <small style="display:block;color:var(--clr-text-muted);font-size:.75rem;margin-top:2px;">
+                          Suscripción · <?= e($item['plataformas'] ?? '') ?>
+                        </small>
+                      <?php endif; ?>
+                    </span>
                   </div>
                 </td>
                 <td>$<?= number_format((float)$item['precio'], 2) ?></td>
@@ -234,19 +246,10 @@ if (!empty($_SESSION['pago_error'])) {
 
           <?php if ($descuentoPts > 0): ?>
           <div class="cart-summary-row" style="font-size:.88rem;">
-            <span class="label" style="color:var(--clr-text-muted);">Subtotal</span>
-            <span style="color:var(--clr-text-muted);" id="cartTotal">$<?= number_format($total, 2) ?></span>
-          </div>
-          <div class="cart-summary-row" style="font-size:.88rem;">
             <span class="label" style="color:var(--clr-success);">
               <i class="fa-solid fa-tag" aria-hidden="true"></i> Descuento puntos
             </span>
             <span style="color:var(--clr-success);" id="cartDescuento">−$<?= number_format($descuentoPts, 2) ?></span>
-          </div>
-          <?php else: ?>
-          <div class="cart-summary-row">
-            <span class="label">Subtotal</span>
-            <span id="cartTotal">$<?= number_format($total, 2) ?></span>
           </div>
           <?php endif; ?>
 
@@ -276,86 +279,102 @@ if (!empty($_SESSION['pago_error'])) {
 
 <script>
 (function () {
+  /* Mapa carrito-id → precio unitario (solo productos presentes al cargar) */
   const precios = {
     <?php foreach ($items as $item): ?>
-      '<?= (int)$item['id'] ?>': <?= (float)$item['precio'] ?>,
+      <?= (int)$item['id'] ?>: <?= (float)$item['precio'] ?>,
     <?php endforeach; ?>
   };
 
-  const puntosUsados = <?= (int)$puntosUsados ?>;   /* puntos aplicados en sesión */
+  const puntosUsados = <?= (int)$puntosUsados ?>;
 
+  /* ── Recalcula subtotal, descuento, total y cashback ─────────────── */
   function updateTotals() {
     let subtotal = 0;
+
     document.querySelectorAll('[id^="qty-"]').forEach(function (el) {
-      const id  = el.id.replace('qty-', '');
-      const qty = parseInt(el.textContent, 10);
-      const sub = (precios[id] || 0) * qty;
-      subtotal += sub;
-      const subEl = document.getElementById('subtotal-' + id);
-      if (subEl) subEl.textContent = '$' + sub.toFixed(2);
+      const rowId = el.id.replace('qty-', '');
+      const qty   = parseInt(el.textContent, 10) || 0;
+      const price = precios[rowId] || 0;
+      const linea = price * qty;
+      subtotal += linea;
+
+      const subEl = document.getElementById('subtotal-' + rowId);
+      if (subEl) subEl.textContent = '$' + linea.toFixed(2);
     });
 
     const descuento  = Math.min(puntosUsados, subtotal);
     const totalFinal = Math.max(0, subtotal - descuento);
 
-    /* Subtotal (sin descuento) */
     const cartTotalEl = document.getElementById('cartTotal');
     if (cartTotalEl) cartTotalEl.textContent = '$' + subtotal.toFixed(2);
 
-    /* Línea de descuento (si existe) */
     const descEl = document.getElementById('cartDescuento');
     if (descEl) descEl.textContent = '−$' + descuento.toFixed(2);
 
-    /* Total final */
-    document.getElementById('cartTotalFinal').textContent = '$' + totalFinal.toFixed(2);
+    const totalFinalEl = document.getElementById('cartTotalFinal');
+    if (totalFinalEl) totalFinalEl.textContent = '$' + totalFinal.toFixed(2);
 
-    /* Cashback sobre el total final */
     const cbEl = document.getElementById('cashbackVal');
     if (cbEl) cbEl.textContent = '+' + Math.floor(totalFinal * 0.10) + ' puntos';
   }
 
+  /* ── Actualiza badge del carrito en el header ─────────────────────── */
+  function updateBadge(count) {
+    const badge = document.getElementById('cartBadge');
+    if (!badge) return;
+    badge.textContent = count;
+    badge.classList.toggle('d-none', count === 0);
+  }
+
+  /* ── Listener único para qty-btn y botón remove ───────────────────── */
   document.querySelectorAll('.qty-btn, [data-action="remove"]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       const id     = btn.dataset.id;
       const action = btn.dataset.action;
+
+      /* Deshabilitar mientras se procesa para evitar doble-clic */
+      btn.disabled = true;
 
       fetch('actualizar_carrito.php', {
         method:  'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body:    'id=' + encodeURIComponent(id) + '&action=' + encodeURIComponent(action),
       })
-      .then(r => r.json())
+      .then(function (r) { return r.json(); })
       .then(function (data) {
-        if (action === 'remove' || data.qty <= 0) {
+        if (action === 'remove') {
+          /* Eliminar fila del DOM y del mapa de precios */
           const row = document.getElementById('row-' + id);
           if (row) row.remove();
           delete precios[id];
-        } else {
-          const qtyEl = document.getElementById('qty-' + id);
-          if (qtyEl) qtyEl.textContent = data.qty;
-        }
-        updateTotals();
-        if (data.cartCount !== undefined) {
-          const badge = document.getElementById('cartBadge');
-          if (badge) {
-            badge.textContent = data.cartCount;
-            badge.classList.toggle('d-none', data.cartCount === 0);
+
+          /* Si el carrito quedó vacío, recargar para mostrar pantalla vacía */
+          const cartBody = document.getElementById('cartBody');
+          if (cartBody && cartBody.querySelectorAll('tr').length === 0) {
+            location.reload();
+            return;
           }
+        } else {
+          /* increase / decrease: actualizar qty en DOM */
+          const qtyEl = document.getElementById('qty-' + id);
+          if (qtyEl && data.qty != null) qtyEl.textContent = data.qty;
+          btn.disabled = false;
         }
+
+        updateTotals();
+        if (data.cartCount != null) updateBadge(data.cartCount);
       })
       .catch(function () { location.reload(); });
     });
   });
 
-  /* Validación: si total = 0, recargar en lugar de ir al pago */
+  /* ── Ir al pago solo si hay importe > 0 ──────────────────────────── */
   document.querySelectorAll('.pay-trigger').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      const totalText = (document.getElementById('cartTotalFinal') || {}).textContent || '0';
-      const totalNum  = parseFloat(totalText.replace(/[^0-9.]/g, ''));
-      if (!totalNum || totalNum <= 0) {
-        location.reload();
-        return;
-      }
+      const txt = (document.getElementById('cartTotalFinal') || {}).textContent || '0';
+      const num = parseFloat(txt.replace(/[^0-9.]/g, ''));
+      if (!num || num <= 0) { location.reload(); return; }
       window.location.href = btn.dataset.href;
     });
   });

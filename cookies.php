@@ -5,7 +5,7 @@ require_once 'header.php';
 
 <div class="legal-page">
   <h1>Política de Cookies</h1>
-  <p class="legal-date">Última actualización: enero 2025</p>
+  <p class="legal-date">Última actualización: mayo 2026</p>
 
   <div class="legal-section">
     <h2>¿Qué son las cookies?</h2>

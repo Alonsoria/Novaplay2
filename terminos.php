@@ -9,7 +9,7 @@ require_once 'header.php';
 
 <div class="legal-page">
   <h1>Términos y Condiciones</h1>
-  <p class="legal-date">Última actualización: enero 2025</p>
+  <p class="legal-date">Última actualización: mayo 2026</p>
 
   <div class="legal-section">
     <h2>1. Aceptación</h2>

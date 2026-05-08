@@ -15,22 +15,24 @@ $busqueda   = clean_str($_GET['q'] ?? '');
 /* ── Query corregida con JOIN a tabla plataformas ── */
 if ($plataforma !== '') {
     $stmt = $conn->prepare(
-        "SELECT DISTINCT p.* FROM productos p 
-         INNER JOIN producto_plataforma pp ON p.id_producto = pp.id_producto 
-         INNER JOIN plataformas pl ON pp.id_plataforma = pl.id_plataforma 
-         WHERE pl.nombre = ?"
+        "SELECT DISTINCT p.* FROM productos p
+         INNER JOIN producto_plataforma pp ON p.id_producto = pp.id_producto
+         INNER JOIN plataformas pl ON pp.id_plataforma = pl.id_plataforma
+         WHERE pl.nombre = ? AND COALESCE(p.es_suscripcion, 0) = 0"
     );
     $stmt->bind_param("s", $plataforma);
     $stmt->execute();
     $result = $stmt->get_result();
 } elseif ($busqueda !== '') {
-    $stmt = $conn->prepare("SELECT * FROM productos WHERE nombre LIKE ? OR descripcion LIKE ?");
+    $stmt = $conn->prepare(
+        "SELECT * FROM productos WHERE (nombre LIKE ? OR descripcion LIKE ?) AND COALESCE(es_suscripcion, 0) = 0"
+    );
     $like = '%' . $busqueda . '%';
     $stmt->bind_param("ss", $like, $like);
     $stmt->execute();
     $result = $stmt->get_result();
 } else {
-    $result = $conn->query("SELECT * FROM productos");
+    $result = $conn->query("SELECT * FROM productos WHERE COALESCE(es_suscripcion, 0) = 0");
 }
 
 $juegos = [];
