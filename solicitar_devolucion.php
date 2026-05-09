@@ -48,7 +48,7 @@ $productosSel = array_values(array_map(fn($p) => clean_str((string)$p), $product
 /* Verificar que el pedido pertenece al usuario y está pagado */
 $stmt = $conn->prepare(
     "SELECT id_pedido, total, fecha FROM pedidos
-     WHERE id_pedido = ? AND id_usuario = ? AND estado = 'pagado'"
+     WHERE id_pedido = ? AND id_usuario = ? AND estado = 'pagado' AND confirmado = 0"
 );
 $stmt->bind_param("ii", $pedidoId, $uid);
 $stmt->execute();
@@ -57,7 +57,7 @@ $stmt->close();
 
 if (!$pedido) {
     http_response_code(404);
-    echo json_encode(['error' => 'Pedido no encontrado o no elegible para devolución']);
+    echo json_encode(['error' => 'Pedido no encontrado o no elegible. Los pedidos ya confirmados no admiten devolución.']);
     exit;
 }
 
@@ -117,6 +117,12 @@ $stmtIns->bind_param("iis", $pedidoId, $uid, $productosJson);
 $stmtIns->execute();
 $stmtIns->close();
 
+/* ── Marcar el pedido como reembolsado ── */
+$stmtUpd = $conn->prepare("UPDATE pedidos SET estado = 'reembolsado' WHERE id_pedido = ?");
+$stmtUpd->bind_param("i", $pedidoId);
+$stmtUpd->execute();
+$stmtUpd->close();
+
 /* ── Notificación en plataforma ── */
 $msgNot = "Tu devolución del pedido #{$pedidoId} fue aprobada."
     . ($puntosDeducidos > 0 ? " Se dedujeron {$puntosDeducidos} pts de cashback." : '');
@@ -170,4 +176,11 @@ nova_send_mail(
     $emailBody
 );
 
-echo json_encode(['success' => true]);
+/* ── Leer puntos actualizados para la respuesta ── */
+$stmtPts = $conn->prepare("SELECT puntos FROM usuarios WHERE id_usuario = ?");
+$stmtPts->bind_param("i", $uid);
+$stmtPts->execute();
+$nuevosPuntos = (int)($stmtPts->get_result()->fetch_assoc()['puntos'] ?? 0);
+$stmtPts->close();
+
+echo json_encode(['success' => true, 'puntos' => $nuevosPuntos]);

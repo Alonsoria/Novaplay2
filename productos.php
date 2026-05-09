@@ -42,7 +42,30 @@ if ($result) {
     }
 }
 
-$plataformas = ['PlayStation', 'Xbox', 'Nintendo', 'PC'];
+/* ── Cargar IDs de plataforma para todos los productos en una sola query ── */
+$platsPorProducto = [];
+if (!empty($juegos)) {
+    $ids          = array_column($juegos, 'id_producto');
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $types        = str_repeat('i', count($ids));
+    $stmtPl       = $conn->prepare(
+        "SELECT id_producto,
+                GROUP_CONCAT(id_plataforma ORDER BY id_plataforma SEPARATOR ',') AS plataformas
+         FROM producto_plataforma
+         WHERE id_producto IN ($placeholders)
+         GROUP BY id_producto"
+    );
+    $stmtPl->bind_param($types, ...$ids);
+    $stmtPl->execute();
+    $resPl = $stmtPl->get_result();
+    while ($row = $resPl->fetch_assoc()) {
+        $platsPorProducto[(int)$row['id_producto']] =
+            array_map('intval', explode(',', $row['plataformas']));
+    }
+    $stmtPl->close();
+}
+
+$plataformas = ['PlayStation', 'Xbox', 'Nintendo', 'Steam'];
 ?>
 
 <main aria-label="Catálogo de productos">
@@ -119,22 +142,25 @@ $plataformas = ['PlayStation', 'Xbox', 'Nintendo', 'PC'];
           <p><?= e(mb_substr($juego['descripcion'] ?? '', 0, 90)) ?>…</p>
           <strong>$<?= number_format((float)($juego['precio'] ?? 0), 2) ?></strong>
 
-          <?php if (!empty($juego['plataformas'])): ?>
+          <?php
+          $platImgMap = [
+              1 => ['src' => 'images/plataformas/xboxlogo.png',       'name' => 'Xbox'],
+              2 => ['src' => 'images/plataformas/playstationlogo.png', 'name' => 'PlayStation'],
+              3 => ['src' => 'images/plataformas/steamlogo.png',       'name' => 'Steam'],
+              4 => ['src' => 'images/plataformas/nintendologo.png',    'name' => 'Nintendo'],
+          ];
+          $juegoPlats = $platsPorProducto[(int)$juego['id_producto']] ?? [];
+          if (!empty($juegoPlats)):
+          ?>
             <div class="plat-list">
-              <?php
-              $platImgs = [
-                'PlayStation' => 'img/ps.png',
-                'Xbox'        => 'img/xbox.png',
-                'Nintendo'    => 'img/nintendo.png',
-                'PC'          => 'img/pc.png',
-              ];
-              foreach (explode(',', $juego['plataformas']) as $plat):
-                $plat   = trim($plat);
-                $imgSrc = $platImgs[$plat] ?? null;
+              <?php foreach ($juegoPlats as $pid):
+                $pInfo = $platImgMap[$pid] ?? null;
+                if (!$pInfo) continue;
               ?>
-                <?php if ($imgSrc): ?>
-                  <img src="<?= e($imgSrc) ?>" alt="<?= e($plat) ?>" class="plat-thumb" title="<?= e($plat) ?>">
-                <?php endif; ?>
+                <img src="<?= e($pInfo['src']) ?>"
+                     alt="<?= e($pInfo['name']) ?>"
+                     title="<?= e($pInfo['name']) ?>"
+                     class="plat-thumb">
               <?php endforeach; ?>
             </div>
           <?php endif; ?>

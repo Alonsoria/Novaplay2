@@ -16,6 +16,29 @@ if ($result) {
     }
 }
 
+/* ── Plataformas de los productos destacados ── */
+$platsPorProducto = [];
+if (!empty($juegos)) {
+    $ids          = array_column($juegos, 'id_producto');
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $types        = str_repeat('i', count($ids));
+    $stmtPl       = $conn->prepare(
+        "SELECT id_producto,
+                GROUP_CONCAT(id_plataforma ORDER BY id_plataforma SEPARATOR ',') AS plataformas
+         FROM producto_plataforma
+         WHERE id_producto IN ($placeholders)
+         GROUP BY id_producto"
+    );
+    $stmtPl->bind_param($types, ...$ids);
+    $stmtPl->execute();
+    $resPl = $stmtPl->get_result();
+    while ($row = $resPl->fetch_assoc()) {
+        $platsPorProducto[(int)$row['id_producto']] =
+            array_map('intval', explode(',', $row['plataformas']));
+    }
+    $stmtPl->close();
+}
+
 /* ── Datos hero (slides) ── */
 $heroSlides = [
     [
@@ -71,9 +94,9 @@ $subs = [
         'class'    => 'xbox',
         'badge'    => 'Xbox',
         'plans'    => [
-            ['name' => 'Xbox Game Pass Essential',     'price' => '$129',  'period' => '/mes',  'features' => ['Más de 50 juegos en la consola Xbox, PC y dispositivos compatibles', 'Juegos multijugador en línea para consola', 'Beneficios para juegos como League of Legends y Call of Duty: Warzone']],
-            ['name' => 'Xbox Game Pass Premium',     'price' => '$179',  'period' => '/mes',  'features' => ['Más de 200 juegos en la consola Xbox, PC y dispositivos compatibles', 'Beneficios para juegos como League of Legends y Call of Duty: Warzone', 'Juegos multijugador en línea para consola']],
-            ['name' => 'Xbox Game Pass Ultimate', 'price' => '$289', 'period' => '/mes',  'features' => ['Más de 400 juegos en la consola Xbox, PC y dispositivos compatibles','Nuevos juegos desde el mismo día de su lanzamiento','Incluye Club de Fortnite, EA Play y Ubisoft+ Classics', 'Juegos multijugador en línea para consola', 'Cloud gaming en móvil y tablet']]
+            ['name' => 'Xbox Game Pass Essential 1 mes',     'price' => '$129',  'period' => '/mes',  'features' => ['Más de 50 juegos en la consola Xbox, PC y dispositivos compatibles', 'Juegos multijugador en línea para consola', 'Beneficios para juegos como League of Legends y Call of Duty: Warzone']],
+            ['name' => 'Xbox Game Pass Premium 1 mes',     'price' => '$179',  'period' => '/mes',  'features' => ['Más de 200 juegos en la consola Xbox, PC y dispositivos compatibles', 'Beneficios para juegos como League of Legends y Call of Duty: Warzone', 'Juegos multijugador en línea para consola']],
+            ['name' => 'Xbox Game Pass Ultimate 1 mes', 'price' => '$289', 'period' => '/mes',  'features' => ['Más de 400 juegos en la consola Xbox, PC y dispositivos compatibles','Nuevos juegos desde el mismo día de su lanzamiento','Incluye Club de Fortnite, EA Play y Ubisoft+ Classics', 'Juegos multijugador en línea para consola', 'Cloud gaming en móvil y tablet']]
         ],
         'btn_text' => 'Ver planes Xbox',
         'btn_id'   => 'btnXbox',
@@ -82,9 +105,9 @@ $subs = [
         'class'    => 'playstation',
         'badge'    => 'PlayStation',
         'plans'    => [
-            ['name' => 'PS Plus Essential', 'price' => '$119',  'period' => '/mes', 'features' => ['Juegos mensuales: puedes descargar y jugar títulos nuevos cada mes mientras tengas la suscripción.', 'Multijugador online: acceso para jugar en línea con otros jugadores.', 'Descuentos exclusivos: ofertas especiales en la tienda de PlayStation.']],
-            ['name' => 'PS Plus Extra',     'price' => '$179', 'period' => '/mes', 'features' => ['Todo lo de Essential', 'Catálogo de cientos de juegos (PS4 y PS5)', 'Juegos de Ubisoft+']],
-            ['name' => 'PS Plus Deluxe',   'price' => '$209', 'period' => '/mes', 'features' => ['Todo lo de Extra', 'Catálogo clásico (PS1/PS2/PSP)', 'Streaming de juegos', 'Pruebas de tiempo limitado']],
+            ['name' => 'PS Plus Essential 1 mes', 'price' => '$119',  'period' => '/mes', 'features' => ['Juegos mensuales: puedes descargar y jugar títulos nuevos cada mes mientras tengas la suscripción.', 'Multijugador online: acceso para jugar en línea con otros jugadores.', 'Descuentos exclusivos: ofertas especiales en la tienda de PlayStation.']],
+            ['name' => 'PS Plus Extra 1 mes',     'price' => '$179', 'period' => '/mes', 'features' => ['Todo lo de Essential', 'Catálogo de cientos de juegos (PS4 y PS5)', 'Juegos de Ubisoft+']],
+            ['name' => 'PS Plus Deluxe 1 mes',   'price' => '$209', 'period' => '/mes', 'features' => ['Todo lo de Extra', 'Catálogo clásico (PS1/PS2/PSP)', 'Streaming de juegos', 'Pruebas de tiempo limitado']],
         ],
         'btn_text' => 'Ver planes PS Plus',
         'btn_id'   => 'btnPS',
@@ -93,8 +116,8 @@ $subs = [
         'class'    => 'nintendo',
         'badge'    => 'Nintendo',
         'plans'    => [
-            ['name' => 'Nintendo Switch Online ', 'price' => '$309',  'period' => '/año', 'features' => ['Multijugador online', 'NES + SNES clásicos', 'Almacenamiento en la nube', 'Ofertas exclusivas']],
-            ['name' => 'Nintendo Switch Online + Paquete Expansión', 'price' => '$859', 'period' => '/año', 'features' => ['Todo lo del plan básico', 'Más juegos clásicos (N64 + Genesis + GBA + GBC)', 'DLC gratuito de juegos']]
+            ['name' => 'Nintendo Switch Online 1 año', 'price' => '$309',  'period' => '/año', 'features' => ['Multijugador online', 'NES + SNES clásicos', 'Almacenamiento en la nube', 'Ofertas exclusivas']],
+            ['name' => 'Nintendo Switch Online + Paquete Expansión 1 año', 'price' => '$859', 'period' => '/año', 'features' => ['Todo lo del plan básico', 'Más juegos clásicos (N64 + Genesis + GBA + GBC)', 'DLC gratuito de juegos']]
         ],
         'btn_text' => 'Ver planes Nintendo',
         'btn_id'   => 'btnNintendo',
@@ -238,28 +261,25 @@ unset($sub, $plan);
           <p><?= e(mb_substr($juego['descripcion'] ?? '', 0, 80)) ?>…</p>
           <strong>$<?= number_format((float)($juego['precio'] ?? 0), 2) ?></strong>
 
-          <?php if (!empty($juego['plataformas'])): ?>
+          <?php
+          $platImgMap = [
+              1 => ['src' => 'images/plataformas/xboxlogo.png',       'name' => 'Xbox'],
+              2 => ['src' => 'images/plataformas/playstationlogo.png', 'name' => 'PlayStation'],
+              3 => ['src' => 'images/plataformas/steamlogo.png',       'name' => 'Steam'],
+              4 => ['src' => 'images/plataformas/nintendologo.png',    'name' => 'Nintendo'],
+          ];
+          $juegoPlats = $platsPorProducto[(int)$juego['id_producto']] ?? [];
+          if (!empty($juegoPlats)):
+          ?>
             <div class="plat-list">
-              <?php
-              $plats = explode(',', $juego['plataformas']);
-              $platImgs = [
-                'PlayStation' => 'img/ps.png',
-                'Xbox'        => 'img/xbox.png',
-                'Nintendo'    => 'img/nintendo.png',
-                'PC'          => 'img/pc.png',
-              ];
-              foreach ($plats as $plat):
-                $plat = trim($plat);
-                $imgSrc = $platImgs[$plat] ?? null;
+              <?php foreach ($juegoPlats as $pid):
+                $pInfo = $platImgMap[$pid] ?? null;
+                if (!$pInfo) continue;
               ?>
-                <?php if ($imgSrc): ?>
-                  <img src="<?= e($imgSrc) ?>"
-                       alt="<?= e($plat) ?>"
-                       class="plat-thumb"
-                       title="<?= e($plat) ?>">
-                <?php else: ?>
-                  <small class="text-muted"><?= e($plat) ?></small>
-                <?php endif; ?>
+                <img src="<?= e($pInfo['src']) ?>"
+                     alt="<?= e($pInfo['name']) ?>"
+                     title="<?= e($pInfo['name']) ?>"
+                     class="plat-thumb">
               <?php endforeach; ?>
             </div>
           <?php endif; ?>

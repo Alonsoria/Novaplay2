@@ -100,7 +100,7 @@ $stmtD->close();
 /* ── Pedidos del usuario ── */
 $pedidos = [];
 $stmtPed = $conn->prepare(
-    "SELECT id_pedido, total, estado, fecha FROM pedidos
+    "SELECT id_pedido, total, estado, fecha, confirmado FROM pedidos
      WHERE id_usuario = ? ORDER BY fecha DESC LIMIT 20"
 );
 $stmtPed->bind_param("i", $uid);
@@ -117,23 +117,47 @@ $stmtCnt->execute();
 $totalPedidos = (int)($stmtCnt->get_result()->fetch_assoc()['c'] ?? 0);
 $stmtCnt->close();
 
-/* ── Códigos de activación agrupados por pedido ── */
-$codigosPorPedido = [];
+/* ── Productos y códigos agrupados por pedido ── */
+$productosPorPedido = [];
+$codigosConfirmados = [];
+$confirmadoMap      = [];
+foreach ($pedidos as $ped) {
+    $confirmadoMap[(int)$ped['id_pedido']] = (int)$ped['confirmado'];
+}
 if (!empty($pedidos)) {
     $idsPedidos   = array_column($pedidos, 'id_pedido');
     $placeholders = implode(',', array_fill(0, count($idsPedidos), '?'));
     $types        = str_repeat('i', count($idsPedidos));
     $stmtCod      = $conn->prepare(
-        "SELECT id_pedido, nombre_producto, codigo
-         FROM codigos_activacion
-         WHERE id_pedido IN ($placeholders)
-         ORDER BY id"
+        "SELECT ca.id_pedido, ca.nombre_producto, ca.imagen_producto, ca.codigo,
+                COALESCE(GROUP_CONCAT(DISTINCT pp.id_plataforma ORDER BY pp.id_plataforma SEPARATOR ','), '') AS plataformas
+         FROM codigos_activacion ca
+         LEFT JOIN producto_plataforma pp ON ca.id_producto = pp.id_producto
+         WHERE ca.id_pedido IN ($placeholders)
+         GROUP BY ca.id, ca.id_pedido, ca.nombre_producto, ca.imagen_producto, ca.codigo
+         ORDER BY ca.id"
     );
     $stmtCod->bind_param($types, ...$idsPedidos);
     $stmtCod->execute();
     $resCod = $stmtCod->get_result();
     while ($row = $resCod->fetch_assoc()) {
-        $codigosPorPedido[$row['id_pedido']][] = $row;
+        $pid   = (int)$row['id_pedido'];
+        $plats = $row['plataformas'] !== ''
+            ? array_map('intval', explode(',', $row['plataformas']))
+            : [];
+        $productosPorPedido[$pid][] = [
+            'nombre_producto' => $row['nombre_producto'],
+            'imagen_producto' => $row['imagen_producto'],
+            'plataformas'     => $plats,
+        ];
+        if ($confirmadoMap[$pid] ?? 0) {
+            $codigosConfirmados[$pid][] = [
+                'nombre_producto' => $row['nombre_producto'],
+                'imagen_producto' => $row['imagen_producto'],
+                'plataformas'     => $plats,
+                'codigo'          => $row['codigo'],
+            ];
+        }
     }
     $stmtCod->close();
 }
@@ -178,7 +202,7 @@ try {
       <div>
         <div style="font-size:.8rem;color:var(--clr-text-muted);text-transform:uppercase;letter-spacing:.06em;">Tus puntos acumulados</div>
         <div style="font-size:1.8rem;font-weight:700;color:var(--clr-neon);font-family:var(--font-display);">
-          <?= number_format((int)($user['puntos'] ?? 0)) ?> pts
+          <span id="perfil-puntos-val"><?= number_format((int)($user['puntos'] ?? 0)) ?> pts</span>
         </div>
       </div>
     </div>
@@ -316,49 +340,53 @@ try {
               <tr>
                 <th scope="col"># Pedido</th>
                 <th scope="col">Total</th>
-                <th scope="col">Estado</th>
                 <th scope="col">Fecha</th>
-                <th scope="col">Detalle</th>
+                <th scope="col">Acción</th>
                 <th scope="col">Devolución</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="pedidos-tbody">
               <?php
-              /* $numActual se usa como display (#1, #2…). Se captura ANTES
-                 del decremento para pasarlo al modal y mantener consistencia. */
               $numActual = min($totalPedidos, count($pedidos));
               foreach ($pedidos as $ped):
                 $pidInt     = (int)$ped['id_pedido'];
-                $numDisplay = $numActual--;   /* captura y luego decrementa */
+                $numDisplay = $numActual--;
+                $conf       = (int)$ped['confirmado'];
               ?>
-                <tr>
+                <tr data-pedido="<?= $pidInt ?>"
+                    data-numero="<?= $numDisplay ?>"
+                    data-confirmado="<?= $conf ?>"
+                    <?= ($conf && $ped['estado'] === 'pagado') ? 'style="cursor:pointer;"' : '' ?>>
                   <td>#<?= $numDisplay ?></td>
                   <td>$<?= number_format((float)$ped['total'], 2) ?></td>
-                  <td>
-                    <span style="color:var(--clr-<?= $ped['estado'] === 'pagado' ? 'success' : ($ped['estado'] === 'cancelado' ? 'danger' : 'warning') ?>);">
-                      <?= ucfirst(e($ped['estado'])) ?>
-                    </span>
-                  </td>
                   <td style="color:var(--clr-text-muted);font-size:.85rem;">
                     <?= date('d/m/Y H:i', strtotime($ped['fecha'])) ?>
                   </td>
-                  <td>
-                    <?php if (!empty($codigosPorPedido[$pidInt])): ?>
+                  <td id="accion-td-<?= $pidInt ?>">
+                    <?php if ($ped['estado'] === 'reembolsado'): ?>
+                      <span style="color:var(--clr-warning);font-size:.88rem;">
+                        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Reembolsado
+                      </span>
+                    <?php elseif ($ped['estado'] === 'pagado' && !$conf): ?>
                       <button type="button"
-                              class="btn-ver-detalle"
+                              class="btn-confirmar-prod"
                               data-pedido="<?= $pidInt ?>"
                               data-numero="<?= $numDisplay ?>"
                               style="background:linear-gradient(135deg,var(--clr-accent),var(--clr-accent-2));
                                      border:none;border-radius:6px;padding:5px 10px;
                                      color:#fff;font-size:.8rem;cursor:pointer;white-space:nowrap;">
-                        <i class="fa-solid fa-eye" aria-hidden="true"></i> Ver
+                        <i class="fa-solid fa-unlock" aria-hidden="true"></i> Confirmar productos
                       </button>
+                    <?php elseif ($ped['estado'] === 'pagado' && $conf): ?>
+                      <span style="color:var(--clr-accent);font-size:.85rem;">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i> Ver códigos
+                      </span>
                     <?php else: ?>
                       <span style="color:var(--clr-border);font-size:.85rem;">—</span>
                     <?php endif; ?>
                   </td>
-                  <td>
-                    <?php if ($ped['estado'] === 'pagado'): ?>
+                  <td id="devolver-td-<?= $pidInt ?>">
+                    <?php if ($ped['estado'] === 'pagado' && !$conf): ?>
                       <button type="button"
                               class="btn-devolver"
                               data-pedido="<?= $pidInt ?>"
@@ -477,31 +505,11 @@ try {
     </div>
   </div>
 
-  <!-- ── Modal: detalle de pedido ── -->
-  <div id="modal-detalle-pedido"
-       role="dialog" aria-modal="true" aria-labelledby="modal-ped-titulo"
-       style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);
-              z-index:10000;align-items:center;justify-content:center;padding:16px;">
-    <div style="background:var(--clr-surface);border-radius:16px;padding:28px 28px 24px;
-                max-width:580px;width:100%;max-height:82vh;overflow-y:auto;
-                position:relative;box-shadow:0 0 50px rgba(0,0,0,.6);">
-
-      <button onclick="cerrarModalDetalle()"
-              aria-label="Cerrar"
-              style="position:absolute;top:14px;right:18px;background:none;border:none;
-                     color:var(--clr-text-muted);font-size:1.4rem;cursor:pointer;line-height:1;">
-        <i class="fa-solid fa-xmark"></i>
-      </button>
-
-      <h3 id="modal-ped-titulo"
-          style="margin-bottom:20px;color:var(--clr-white);font-family:var(--font-display);font-size:1.2rem;">
-        <i class="fa-solid fa-box" style="color:var(--clr-accent);margin-right:8px;" aria-hidden="true"></i>
-        Detalle del Pedido
-      </h3>
-
-      <div id="modal-detalle-body"></div>
-    </div>
-  </div>
+  <?php
+  $mpProductos = $productosPorPedido;
+  $mpCodigos   = $codigosConfirmados;
+  require_once '_modal_confirmacion.php';
+  ?>
 
 </main>
 
@@ -530,87 +538,48 @@ try {
   }
 })();
 
-/* ── Modal detalle de pedido ── */
+/* ── Bindings de perfil para el modal compartido de pedido ── */
 (function () {
-  const _codigos = <?= json_encode($codigosPorPedido, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
-  const modal    = document.getElementById('modal-detalle-pedido');
-  const body     = document.getElementById('modal-detalle-body');
-  const titulo   = document.getElementById('modal-ped-titulo');
-
-  document.querySelectorAll('.btn-ver-detalle').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      const pedId     = parseInt(btn.dataset.pedido, 10);
-      /* data-numero = número relativo del usuario (consistente con la tabla) */
-      const numDisplay = btn.dataset.numero || pedId;
-      const lista      = _codigos[pedId] || [];
-
-      titulo.innerHTML =
-        '<i class="fa-solid fa-box" style="color:var(--clr-accent);margin-right:8px;" aria-hidden="true"></i>' +
-        'Detalle del Pedido #' + numDisplay;
-
-      if (lista.length === 0) {
-        body.innerHTML = '<p style="color:var(--clr-text-muted);">No hay códigos registrados para este pedido.</p>';
-      } else {
-        let html = '<ul style="list-style:none;display:flex;flex-direction:column;gap:12px;margin:0;padding:0;">';
-        lista.forEach(function (item) {
-          const fmt = item.codigo.replace(/(.{4})/g, '$1-').replace(/-$/, '');
-          html += '<li style="background:var(--clr-surface-2);border:1px solid var(--clr-border);' +
-                  'border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;">' +
-                  '<span style="font-weight:600;color:var(--clr-white);font-size:.95rem;">' +
-                  item.nombre_producto + '</span>' +
-                  '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
-                  '<span style="font-family:monospace;color:var(--clr-neon);font-size:1rem;letter-spacing:1px;">' +
-                  fmt + '</span>' +
-                  '<button data-raw="' + item.codigo + '" class="btn-copiar-cod" title="Copiar código" ' +
-                  'style="background:none;border:1px solid var(--clr-border);border-radius:6px;' +
-                  'padding:4px 10px;cursor:pointer;color:var(--clr-text);font-size:.82rem;">' +
-                  '<i class="fa-solid fa-copy" aria-hidden="true"></i> Copiar</button>' +
-                  '</div></li>';
-        });
-        html += '</ul>';
-        body.innerHTML = html;
-
-        /* Copiar al portapapeles */
-        body.querySelectorAll('.btn-copiar-cod').forEach(function (b) {
-          b.addEventListener('click', function () {
-            navigator.clipboard.writeText(b.dataset.raw).then(function () {
-              b.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i> Copiado';
-              b.style.color = 'var(--clr-success)';
-              b.style.borderColor = 'var(--clr-success)';
-              setTimeout(function () {
-                b.innerHTML = '<i class="fa-solid fa-copy" aria-hidden="true"></i> Copiar';
-                b.style.color = '';
-                b.style.borderColor = '';
-              }, 2000);
-            });
-          });
-        });
-      }
-
-      modal.style.display = 'flex';
-      document.body.style.overflow = 'hidden';
-    });
-  });
-
-  window.cerrarModalDetalle = function () {
-    modal.style.display = 'none';
-    document.body.style.overflow = '';
+  /* Callback: actualizar fila de la tabla tras confirmar */
+  window._mpOnConfirm = function (pid) {
+    var row = document.querySelector('tr[data-pedido="' + pid + '"]');
+    if (row) { row.dataset.confirmado = '1'; row.style.cursor = 'pointer'; }
+    var accionTd = document.getElementById('accion-td-' + pid);
+    if (accionTd) {
+      accionTd.innerHTML =
+        '<span style="color:var(--clr-accent);font-size:.85rem;">' +
+        '<i class="fa-solid fa-eye"></i> Ver códigos</span>';
+    }
+    var devolverTd = document.getElementById('devolver-td-' + pid);
+    if (devolverTd) {
+      devolverTd.innerHTML =
+        '<span style="color:var(--clr-border);font-size:.85rem;">—</span>';
+    }
   };
 
-  /* Cerrar al hacer clic fuera del panel */
-  modal.addEventListener('click', function (e) {
-    if (e.target === modal) cerrarModalDetalle();
-  });
+  /* Click en filas ya confirmadas (event delegation) */
+  var tbody = document.getElementById('pedidos-tbody');
+  if (tbody) {
+    tbody.addEventListener('click', function (e) {
+      if (e.target.closest('button')) return;
+      var row = e.target.closest('tr');
+      if (!row || row.dataset.confirmado !== '1') return;
+      window.abrirModalPedido(parseInt(row.dataset.pedido, 10), row.dataset.numero);
+    });
+  }
 
-  /* Cerrar con Escape */
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && modal.style.display === 'flex') cerrarModalDetalle();
+  /* Botones "Confirmar productos" */
+  document.querySelectorAll('.btn-confirmar-prod').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      window.abrirModalPedido(parseInt(btn.dataset.pedido, 10), btn.dataset.numero);
+    });
   });
 })();
 
 /* ── Modal de devolución ── */
 (function () {
-  const codigosDevol = <?= json_encode($codigosPorPedido, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+  const codigosDevol = <?= json_encode($productosPorPedido, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
   const modalDev     = document.getElementById('modal-devolucion');
   const step1        = document.getElementById('dev-step1');
   const step2        = document.getElementById('dev-step2');
@@ -696,6 +665,26 @@ try {
     .then(function (r) { return r.json(); })
     .then(function (data) {
       if (data.success) {
+        /* Actualizar celda de acción */
+        var accionTd2 = document.getElementById('accion-td-' + activePedidoId);
+        if (accionTd2) {
+          accionTd2.innerHTML =
+            '<span style="color:var(--clr-warning);font-size:.88rem;">' +
+            '<i class="fa-solid fa-rotate-left"></i> Reembolsado</span>';
+        }
+        /* Ocultar botón de devolución */
+        var devolverTd = document.getElementById('devolver-td-' + activePedidoId);
+        if (devolverTd) {
+          devolverTd.innerHTML = '<span style="color:var(--clr-border);font-size:.85rem;">—</span>';
+        }
+        /* Actualizar puntos en el banner del perfil y en el header */
+        if (data.puntos !== undefined) {
+          var fmt = new Intl.NumberFormat('es-MX').format(data.puntos);
+          var ptsEl = document.getElementById('perfil-puntos-val');
+          if (ptsEl) ptsEl.textContent = fmt + ' pts';
+          var hdrEl = document.getElementById('header-pts-val');
+          if (hdrEl) hdrEl.textContent = fmt + ' puntos';
+        }
         step2.innerHTML =
           '<div style="text-align:center;padding:20px 0;">' +
           '<i class="fa-solid fa-circle-check" style="font-size:3rem;color:var(--clr-success, #22c55e);' +

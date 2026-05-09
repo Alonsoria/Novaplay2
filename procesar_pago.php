@@ -266,7 +266,7 @@ try {
 
 $_SESSION['pago_exitoso']   = true;
 $_SESSION['pago_cashback']  = $cashback;
-$_SESSION['codigos_compra'] = $codigosCompra;
+$_SESSION['pago_pedido_id'] = $idPedido;
 
 header('Location: success.php');
 exit;

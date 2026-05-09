@@ -53,11 +53,10 @@ $items = [];
 $result = $conn->query(
     "SELECT c.id, c.cantidad, p.id_producto AS producto_id, p.nombre, p.precio, p.imagen,
             COALESCE(p.es_suscripcion, 0) AS es_suscripcion,
-            GROUP_CONCAT(pl.nombre ORDER BY pl.nombre SEPARATOR ', ') AS plataformas
+            GROUP_CONCAT(DISTINCT pp.id_plataforma ORDER BY pp.id_plataforma SEPARATOR ',') AS plataforma_ids
      FROM carrito c
      JOIN  productos p         ON c.id_producto   = p.id_producto
      LEFT JOIN producto_plataforma pp ON p.id_producto   = pp.id_producto
-     LEFT JOIN plataformas pl         ON pp.id_plataforma = pl.id_plataforma
      WHERE c.id_usuario = $uid
      GROUP BY c.id, c.cantidad, p.id_producto, p.nombre, p.precio, p.imagen, p.es_suscripcion"
 );
@@ -123,6 +122,17 @@ if (!empty($_SESSION['pago_error'])) {
             <?php foreach ($items as $item): ?>
               <tr id="row-<?= (int)$item['id'] ?>">
                 <td>
+                  <?php
+                  $platImgMap = [
+                      1 => ['src' => 'images/plataformas/xboxlogo.png',       'name' => 'Xbox'],
+                      2 => ['src' => 'images/plataformas/playstationlogo.png', 'name' => 'PlayStation'],
+                      3 => ['src' => 'images/plataformas/steamlogo.png',       'name' => 'Steam'],
+                      4 => ['src' => 'images/plataformas/nintendologo.png',    'name' => 'Nintendo'],
+                  ];
+                  $itemPlats = !empty($item['plataforma_ids'])
+                      ? array_map('intval', explode(',', $item['plataforma_ids']))
+                      : [];
+                  ?>
                   <div class="product-cell">
                     <?php if (!empty($item['imagen'])): ?>
                       <img src="<?= e($item['imagen']) ?>" alt="<?= e($item['nombre']) ?>">
@@ -131,8 +141,21 @@ if (!empty($_SESSION['pago_error'])) {
                       <?= e($item['nombre']) ?>
                       <?php if ($item['es_suscripcion']): ?>
                         <small style="display:block;color:var(--clr-text-muted);font-size:.75rem;margin-top:2px;">
-                          Suscripción · <?= e($item['plataformas'] ?? '') ?>
+                          Suscripción
                         </small>
+                      <?php endif; ?>
+                      <?php if (!empty($itemPlats)): ?>
+                        <div class="plat-list" style="margin-top:5px;">
+                          <?php foreach ($itemPlats as $pid):
+                            $pInfo = $platImgMap[$pid] ?? null;
+                            if (!$pInfo) continue;
+                          ?>
+                            <img src="<?= e($pInfo['src']) ?>"
+                                 alt="<?= e($pInfo['name']) ?>"
+                                 title="<?= e($pInfo['name']) ?>"
+                                 class="plat-thumb">
+                          <?php endforeach; ?>
+                        </div>
                       <?php endif; ?>
                     </span>
                   </div>

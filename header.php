@@ -220,7 +220,7 @@ if (is_logged_in()) {
         <a href="productos.php?plataforma=PlayStation" role="menuitem"><img src="./images/ps.png" alt=""> PlayStation</a>
         <a href="productos.php?plataforma=Xbox"        role="menuitem"><img src="./images/xbox.png" alt=""> Xbox</a>
         <a href="productos.php?plataforma=Nintendo"    role="menuitem"><img src="./images/nintendo.png" alt=""> Nintendo</a>
-        <a href="productos.php?plataforma=PC"          role="menuitem"><img src="./images/pc.png" alt=""> PC</a>
+        <a href="productos.php?plataforma=Steam"          role="menuitem"><img src="./images/plataformas/steamlogo.png" alt=""> Steam</a>
       </div>
     </div>
 
@@ -246,7 +246,7 @@ if (is_logged_in()) {
           </div>
           <div class="user-hover-card__pts">
             <i class="fa-solid fa-star" style="color:#facc15;" aria-hidden="true"></i>
-            <?= number_format((int)($headerUserInfo['puntos'] ?? 0)) ?> puntos
+            <span id="header-pts-val"><?= number_format((int)($headerUserInfo['puntos'] ?? 0)) ?> puntos</span>
           </div>
         </div>
       </div><!-- /.user-card-wrap -->

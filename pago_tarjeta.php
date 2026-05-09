@@ -236,7 +236,7 @@ if (!empty($_SESSION['pago_error'])) {
                      name="card_cvv"
                      class="form-control"
                      placeholder="•••"
-                     maxlength="4"
+                     maxlength="3"
                      inputmode="numeric"
                      autocomplete="cc-csc">
             </div>
