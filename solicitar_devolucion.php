@@ -1,9 +1,19 @@
 <?php
 /**
  * NOVAPLAY — SOLICITAR_DEVOLUCION.PHP
- * Endpoint AJAX: registra y aprueba inmediatamente una solicitud de devolución,
- * deduce los puntos de cashback proporcionales al precio de los productos devueltos
- * y envía correo de confirmación con información completa del reembolso.
+ * Endpoint AJAX: registra y aprueba inmediatamente una solicitud de devolución.
+ *
+ * Recibe `codigo_ids` (array de IDs de codigos_activacion), lo que permite
+ * devolver N copias de un producto sin afectar las copias restantes.
+ *
+ * Comportamiento según el alcance de la devolución:
+ *   - Devolución TOTAL:     estado → 'reembolsado', confirmado permanece 0.
+ *                           No se acreditan puntos (nunca se emitieron).
+ *   - Devolución PARCIAL:   estado → 'reembolsado', confirmado → 1 (auto-confirma
+ *                           los ítems restantes para que los códigos sean visibles).
+ *                           Se acreditan puntos sobre (total_pagado − total_devuelto).
+ *                           La respuesta incluye `parcial:true` y los códigos del pedido.
+ *
  * Solo acepta POST. Requiere sesión activa.
  */
 
@@ -27,25 +37,30 @@ if (!is_logged_in()) {
 
 $uid      = (int)$_SESSION['user_id'];
 $pedidoId = clean_int($_POST['pedido_id'] ?? null);
-$rawProds = $_POST['productos'] ?? '';
+$rawIds   = $_POST['codigo_ids'] ?? '';
 
-if (!$pedidoId || !$rawProds) {
+if (!$pedidoId || !$rawIds) {
     http_response_code(400);
     echo json_encode(['error' => 'Datos incompletos']);
     exit;
 }
 
-$productosSel = json_decode($rawProds, true);
-if (!is_array($productosSel) || empty($productosSel)) {
+$codigoIds = json_decode($rawIds, true);
+if (!is_array($codigoIds) || empty($codigoIds)) {
     http_response_code(400);
     echo json_encode(['error' => 'Selecciona al menos un producto']);
     exit;
 }
 
-/* Sanitizar nombres de productos */
-$productosSel = array_values(array_map(fn($p) => clean_str((string)$p), $productosSel));
+/* Sanitizar: solo enteros positivos */
+$codigoIds = array_values(array_filter(array_map('intval', $codigoIds), fn($id) => $id > 0));
+if (empty($codigoIds)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'IDs de producto inválidos']);
+    exit;
+}
 
-/* Verificar que el pedido pertenece al usuario y está pagado */
+/* Verificar que el pedido pertenece al usuario y está pagado sin confirmar */
 $stmt = $conn->prepare(
     "SELECT id_pedido, total, fecha FROM pedidos
      WHERE id_pedido = ? AND id_usuario = ? AND estado = 'pagado' AND confirmado = 0"
@@ -76,40 +91,67 @@ if ($stmtChk->num_rows > 0) {
 }
 $stmtChk->close();
 
-/* ── Calcular puntos a deducir ── */
-/* Suma el precio de cada producto devuelto usando codigos_activacion (tiene id_producto)
-   JOIN productos (tiene precio). Si compraron 2 copias del mismo juego y devuelven
-   ese nombre, se suman ambas. */
-$puntosDeducidos = 0;
-$placeholders    = implode(',', array_fill(0, count($productosSel), '?'));
-$types           = 'i' . str_repeat('s', count($productosSel));
-$params          = array_merge([$pedidoId], $productosSel);
+/* ── Validar que los IDs pertenecen al pedido y obtener datos ── */
+$ph          = implode(',', array_fill(0, count($codigoIds), '?'));
+$typesIds    = 'i' . str_repeat('i', count($codigoIds));
+$paramsIds   = array_merge([$pedidoId], $codigoIds);
 
-$stmtPrecio = $conn->prepare(
-    "SELECT COALESCE(SUM(p.precio), 0) AS total_devuelto
+$stmtItems = $conn->prepare(
+    "SELECT ca.id, ca.nombre_producto, p.precio
      FROM codigos_activacion ca
      JOIN productos p ON ca.id_producto = p.id_producto
-     WHERE ca.id_pedido = ?
-       AND ca.nombre_producto IN ($placeholders)"
+     WHERE ca.id_pedido = ? AND ca.id IN ($ph)"
 );
-$stmtPrecio->bind_param($types, ...$params);
-$stmtPrecio->execute();
-$totalDevuelto = (float)($stmtPrecio->get_result()->fetch_assoc()['total_devuelto'] ?? 0);
-$stmtPrecio->close();
+$stmtItems->bind_param($typesIds, ...$paramsIds);
+$stmtItems->execute();
+$resItems      = $stmtItems->get_result();
+$itemsDevueltos = [];
+$totalDevuelto  = 0.0;
+while ($row = $resItems->fetch_assoc()) {
+    $itemsDevueltos[] = $row;
+    $totalDevuelto   += (float)$row['precio'];
+}
+$stmtItems->close();
 
-$puntosDeducidos = (int)floor($totalDevuelto * 0.10);
+/* Marcar los códigos seleccionados como devueltos */
+$stmtMark = $conn->prepare(
+    "UPDATE codigos_activacion SET devuelto = 1 WHERE id_pedido = ? AND id IN ($ph)"
+);
+$stmtMark->bind_param($typesIds, ...$paramsIds);
+$stmtMark->execute();
+$stmtMark->close();
 
-if ($puntosDeducidos > 0) {
-    $stmtDed = $conn->prepare(
-        "UPDATE usuarios SET puntos = GREATEST(0, puntos - ?) WHERE id_usuario = ?"
-    );
-    $stmtDed->bind_param("ii", $puntosDeducidos, $uid);
-    $stmtDed->execute();
-    $stmtDed->close();
+if (empty($itemsDevueltos)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Los productos seleccionados no pertenecen a este pedido.']);
+    exit;
 }
 
-/* ── Registrar la solicitud como aprobada directamente ── */
-$productosJson = json_encode($productosSel, JSON_UNESCAPED_UNICODE);
+/* ── Detectar si es devolución parcial o total ── */
+$stmtCountAll = $conn->prepare(
+    "SELECT COUNT(*) AS c FROM codigos_activacion WHERE id_pedido = ?"
+);
+$stmtCountAll->bind_param("i", $pedidoId);
+$stmtCountAll->execute();
+$totalItems = (int)($stmtCountAll->get_result()->fetch_assoc()['c'] ?? 0);
+$stmtCountAll->close();
+
+$esDevolucionParcial = (count($itemsDevueltos) < $totalItems);
+
+/* ── Construir resumen de nombres para email y registro ── */
+$nombreCounts = [];
+foreach ($itemsDevueltos as $item) {
+    $n = $item['nombre_producto'];
+    $nombreCounts[$n] = ($nombreCounts[$n] ?? 0) + 1;
+}
+$productosDisplay = [];
+foreach ($nombreCounts as $nombre => $cantidad) {
+    $productosDisplay[] = $cantidad > 1 ? "{$nombre} × {$cantidad}" : $nombre;
+}
+$listaProductos = implode("\n  - ", $productosDisplay);
+
+/* ── Registrar la solicitud como aprobada ── */
+$productosJson = json_encode($productosDisplay, JSON_UNESCAPED_UNICODE);
 $stmtIns = $conn->prepare(
     "INSERT INTO solicitudes_devolucion (id_pedido, id_usuario, productos, estado) VALUES (?, ?, ?, 'aprobado')"
 );
@@ -117,15 +159,62 @@ $stmtIns->bind_param("iis", $pedidoId, $uid, $productosJson);
 $stmtIns->execute();
 $stmtIns->close();
 
-/* ── Marcar el pedido como reembolsado ── */
-$stmtUpd = $conn->prepare("UPDATE pedidos SET estado = 'reembolsado' WHERE id_pedido = ?");
-$stmtUpd->bind_param("i", $pedidoId);
+/* ── Actualizar el pedido ── */
+if ($esDevolucionParcial) {
+    /* Parcial: se auto-confirma para que los códigos restantes sean visibles. */
+    $stmtUpd = $conn->prepare(
+        "UPDATE pedidos SET estado = 'reembolsado', confirmado = 1,
+         monto_devuelto = monto_devuelto + ? WHERE id_pedido = ?"
+    );
+} else {
+    /* Total: solo se marca como reembolsado; confirmado permanece 0. */
+    $stmtUpd = $conn->prepare(
+        "UPDATE pedidos SET estado = 'reembolsado',
+         monto_devuelto = monto_devuelto + ? WHERE id_pedido = ?"
+    );
+}
+$stmtUpd->bind_param("di", $totalDevuelto, $pedidoId);
 $stmtUpd->execute();
 $stmtUpd->close();
 
+/* ── Puntos: solo se acreditan en devolución PARCIAL (sobre el importe restante) ── */
+$puntosGanados = 0;
+if ($esDevolucionParcial) {
+    $totalPagado   = (float)$pedido['total'];
+    $totalRestante = max(0.0, $totalPagado - $totalDevuelto);
+    $puntosGanados = (int)floor($totalRestante * 0.10);
+
+    if ($puntosGanados > 0) {
+        $mesCurrent = date('Y-m');
+        $stmtMes = $conn->prepare("SELECT puntos_reset_mes FROM usuarios WHERE id_usuario = ?");
+        $stmtMes->bind_param("i", $uid);
+        $stmtMes->execute();
+        $mesBD = $stmtMes->get_result()->fetch_assoc()['puntos_reset_mes'] ?? '';
+        $stmtMes->close();
+
+        if ($mesBD !== $mesCurrent) {
+            $stmtPts = $conn->prepare(
+                "UPDATE usuarios SET puntos = ?, puntos_reset_mes = ? WHERE id_usuario = ?"
+            );
+            $stmtPts->bind_param("isi", $puntosGanados, $mesCurrent, $uid);
+        } else {
+            $stmtPts = $conn->prepare(
+                "UPDATE usuarios SET puntos = puntos + ? WHERE id_usuario = ?"
+            );
+            $stmtPts->bind_param("ii", $puntosGanados, $uid);
+        }
+        $stmtPts->execute();
+        $stmtPts->close();
+    }
+}
+
 /* ── Notificación en plataforma ── */
-$msgNot = "Tu devolución del pedido #{$pedidoId} fue aprobada."
-    . ($puntosDeducidos > 0 ? " Se dedujeron {$puntosDeducidos} pts de cashback." : '');
+if ($esDevolucionParcial) {
+    $msgNot = "Devolución parcial del pedido #{$pedidoId} aprobada."
+        . ($puntosGanados > 0 ? " Ganaste {$puntosGanados} pts por los productos confirmados." : '');
+} else {
+    $msgNot = "Tu devolución del pedido #{$pedidoId} fue aprobada. Reembolso en camino.";
+}
 try {
     $stmtN = $conn->prepare("INSERT INTO notificaciones (id_usuario, mensaje) VALUES (?, ?)");
     $stmtN->bind_param("is", $uid, $msgNot);
@@ -140,11 +229,10 @@ $stmtU->execute();
 $userData = $stmtU->get_result()->fetch_assoc();
 $stmtU->close();
 
-/* ── Correo unificado de solicitud + aprobación ── */
-$fechaPedido    = date('d/m/Y', strtotime($pedido['fecha']));
-$listaProductos = implode("\n  - ", $productosSel);
-$ptsLinea       = $puntosDeducidos > 0
-    ? "\nPuntos de cashback deducidos: {$puntosDeducidos} pts\n"
+/* ── Correo de confirmación ── */
+$fechaPedido = date('d/m/Y', strtotime($pedido['fecha']));
+$ptsLinea    = ($esDevolucionParcial && $puntosGanados > 0)
+    ? "\nPuntos acreditados por productos confirmados: {$puntosGanados} pts\n"
     : '';
 
 $emailBody = "Hola {$userData['nombre']},\n\n"
@@ -162,11 +250,10 @@ $emailBody = "Hola {$userData['nombre']},\n\n"
     . "────────────────────────────────────\n"
     . "El importe correspondiente a los productos devueltos será\n"
     . "reembolsado a tu método de pago original.\n\n"
-    . "Tiempo estimado: 1 a 3 días hábiles a partir de hoy.\n"
-    . "El tiempo exacto puede variar según la entidad bancaria\n"
-    . "o procesador de pago que hayas utilizado.\n\n"
-    . "Si pasados 3 días hábiles no ves el reembolso reflejado,\n"
-    . "contáctanos respondiendo a este correo y con gusto te ayudamos.\n\n"
+    . "Tiempo estimado: 1 a 3 días hábiles a partir de hoy.\n\n"
+    . ($esDevolucionParcial
+        ? "Los códigos de los productos que conservas ya están disponibles\nen el historial de tu perfil.\n\n"
+        : '')
     . "Gracias por confiar en Novaplay.\n\n"
     . "— Equipo Novaplay";
 
@@ -176,11 +263,47 @@ nova_send_mail(
     $emailBody
 );
 
-/* ── Leer puntos actualizados para la respuesta ── */
-$stmtPts = $conn->prepare("SELECT puntos FROM usuarios WHERE id_usuario = ?");
-$stmtPts->bind_param("i", $uid);
-$stmtPts->execute();
-$nuevosPuntos = (int)($stmtPts->get_result()->fetch_assoc()['puntos'] ?? 0);
-$stmtPts->close();
+/* ── Leer puntos actualizados ── */
+$stmtPts2 = $conn->prepare("SELECT puntos FROM usuarios WHERE id_usuario = ?");
+$stmtPts2->bind_param("i", $uid);
+$stmtPts2->execute();
+$nuevosPuntos = (int)($stmtPts2->get_result()->fetch_assoc()['puntos'] ?? 0);
+$stmtPts2->close();
 
-echo json_encode(['success' => true, 'puntos' => $nuevosPuntos]);
+/* ── Para devolución parcial: obtener todos los códigos del pedido para el modal ── */
+$productosCodigos = null;
+if ($esDevolucionParcial) {
+    $stmtCod = $conn->prepare(
+        "SELECT ca.nombre_producto, ca.imagen_producto, ca.codigo,
+                COALESCE(GROUP_CONCAT(DISTINCT pp.id_plataforma ORDER BY pp.id_plataforma SEPARATOR ','), '') AS plataformas
+         FROM codigos_activacion ca
+         LEFT JOIN producto_plataforma pp ON ca.id_producto = pp.id_producto
+         WHERE ca.id_pedido = ? AND ca.devuelto = 0
+         GROUP BY ca.id, ca.nombre_producto, ca.imagen_producto, ca.codigo
+         ORDER BY ca.id"
+    );
+    $stmtCod->bind_param("i", $pedidoId);
+    $stmtCod->execute();
+    $resCod = $stmtCod->get_result();
+    $productosCodigos = [];
+    while ($row = $resCod->fetch_assoc()) {
+        $plats = $row['plataformas'] !== ''
+            ? array_map('intval', explode(',', $row['plataformas']))
+            : [];
+        $productosCodigos[] = [
+            'nombre_producto' => $row['nombre_producto'],
+            'imagen_producto' => $row['imagen_producto'],
+            'plataformas'     => $plats,
+            'codigo'          => $row['codigo'],
+        ];
+    }
+    $stmtCod->close();
+}
+
+echo json_encode([
+    'success'        => true,
+    'puntos'         => $nuevosPuntos,
+    'parcial'        => $esDevolucionParcial,
+    'productos'      => $productosCodigos,
+    'total_efectivo' => max(0.0, (float)$pedido['total'] - $totalDevuelto),
+]);

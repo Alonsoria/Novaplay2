@@ -199,31 +199,12 @@ foreach ($cartItems as $item) {
     }
 }
 
-/* ── Cashback 10% con reset mensual ── */
-$cashback   = (int)floor($total * 0.10);
-$mesCurrent = date('Y-m');
-
-$stmtMes = $conn->prepare("SELECT puntos_reset_mes FROM usuarios WHERE id_usuario = ?");
-$stmtMes->bind_param("i", $uid);
-$stmtMes->execute();
-$mesBD = $stmtMes->get_result()->fetch_assoc()['puntos_reset_mes'] ?? '';
-$stmtMes->close();
-
-if ($mesBD !== $mesCurrent) {
-    $stmtR = $conn->prepare("UPDATE usuarios SET puntos = ?, puntos_reset_mes = ? WHERE id_usuario = ?");
-    $stmtR->bind_param("isi", $cashback, $mesCurrent, $uid);
-    $stmtR->execute();
-    $stmtR->close();
-} else {
-    $stmtC = $conn->prepare("UPDATE usuarios SET puntos = puntos + ? WHERE id_usuario = ?");
-    $stmtC->bind_param("ii", $cashback, $uid);
-    $stmtC->execute();
-    $stmtC->close();
-}
+/* ── Cashback potencial (se acredita al confirmar el pedido, no aquí) ── */
+$cashback = (int)floor($total * 0.10);
 
 /* ── Notificación ── */
 try {
-    $msg   = "Pago con tarjeta de $" . number_format($total, 2) . " procesado. Ganaste $cashback puntos.";
+    $msg   = "Pago con tarjeta de $" . number_format($total, 2) . " procesado. Confirma tu pedido para ganar $cashback puntos.";
     $stmtN = $conn->prepare("INSERT INTO notificaciones (id_usuario, mensaje) VALUES (?, ?)");
     $stmtN->bind_param("is", $uid, $msg);
     $stmtN->execute();

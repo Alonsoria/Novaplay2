@@ -738,6 +738,33 @@ main > h2 {
   filter: brightness(1.2);
 }
 
+/* Iconos de plataforma en el carrito (clase propia: cart-plat-icon) */
+.cart-plat-icon {
+  width: 20px;
+  height: 20px;
+  opacity: .85;
+  border-radius: 3px;
+  transition: filter var(--trans-fast), opacity var(--trans-fast);
+}
+
+.cart-plat-icon[src*="xboxlogo"] {
+  filter: drop-shadow(0 0 4px rgba(16, 124, 16, .75));
+}
+.cart-plat-icon[src*="playstationlogo"] {
+  filter: drop-shadow(0 0 4px rgba(0, 68, 156, .80));
+}
+.cart-plat-icon[src*="steamlogo"] {
+  filter: drop-shadow(0 0 4px rgba(102, 192, 244, .75));
+}
+.cart-plat-icon[src*="nintendologo"] {
+  filter: drop-shadow(0 0 4px rgba(230, 0, 18, .75));
+}
+
+.cart-plat-icon:hover {
+  opacity: 1;
+  filter: brightness(1.25);
+}
+
 /* Filtros de plataforma (página productos) */
 .platform-filters {
   display: flex;
@@ -1321,7 +1348,7 @@ main > h2 {
   gap: var(--space-md);
 }
 
-.cart-table .product-cell img {
+.cart-table .product-cell .cart-prod-img {
   width: 60px;
   height: 80px;
   object-fit: cover;

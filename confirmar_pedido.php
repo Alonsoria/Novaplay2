@@ -55,6 +55,41 @@ $stmtUpd->bind_param("i", $pedidoId);
 $stmtUpd->execute();
 $stmtUpd->close();
 
+/* ── Acreditar cashback (10%) — se otorga aquí, al confirmar, no al pagar ── */
+$stmtTotal = $conn->prepare("SELECT total FROM pedidos WHERE id_pedido = ?");
+$stmtTotal->bind_param("i", $pedidoId);
+$stmtTotal->execute();
+$pedidoTotal = (float)($stmtTotal->get_result()->fetch_assoc()['total'] ?? 0);
+$stmtTotal->close();
+
+$cashback   = (int)floor($pedidoTotal * 0.10);
+$mesCurrent = date('Y-m');
+
+$stmtMesU = $conn->prepare("SELECT puntos_reset_mes FROM usuarios WHERE id_usuario = ?");
+$stmtMesU->bind_param("i", $uid);
+$stmtMesU->execute();
+$mesBD = $stmtMesU->get_result()->fetch_assoc()['puntos_reset_mes'] ?? '';
+$stmtMesU->close();
+
+if ($mesBD !== $mesCurrent) {
+    $stmtPts = $conn->prepare(
+        "UPDATE usuarios SET puntos = ?, puntos_reset_mes = ? WHERE id_usuario = ?"
+    );
+    $stmtPts->bind_param("isi", $cashback, $mesCurrent, $uid);
+} else {
+    $stmtPts = $conn->prepare("UPDATE usuarios SET puntos = puntos + ? WHERE id_usuario = ?");
+    $stmtPts->bind_param("ii", $cashback, $uid);
+}
+$stmtPts->execute();
+$stmtPts->close();
+
+/* Leer puntos actualizados para devolver al cliente */
+$stmtNP = $conn->prepare("SELECT puntos FROM usuarios WHERE id_usuario = ?");
+$stmtNP->bind_param("i", $uid);
+$stmtNP->execute();
+$nuevosPuntos = (int)($stmtNP->get_result()->fetch_assoc()['puntos'] ?? 0);
+$stmtNP->close();
+
 /* Obtener códigos con plataformas desde producto_plataforma */
 $stmtCod = $conn->prepare(
     "SELECT ca.nombre_producto, ca.imagen_producto, ca.codigo,
@@ -121,4 +156,9 @@ try {
     error_log('[Novaplay] Error al enviar correo de confirmación: ' . $e->getMessage());
 }
 
-echo json_encode(['success' => true, 'productos' => $productos]);
+echo json_encode([
+    'success'   => true,
+    'productos' => $productos,
+    'cashback'  => $cashback,
+    'puntos'    => $nuevosPuntos,
+]);

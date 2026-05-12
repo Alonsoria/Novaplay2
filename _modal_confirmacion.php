@@ -136,7 +136,7 @@ $_mpCodigos   = $mpCodigos   ?? [];
     if (item.imagen_producto) {
       h += '<img src="' + escHtml(item.imagen_producto) + '"' +
            ' alt="' + escHtml(item.nombre_producto) + '"' +
-           ' style="width:56px;height:56px;object-fit:cover;border-radius:6px;flex-shrink:0;">';
+           ' style="width:60px;height:80px;object-fit:cover;border-radius:6px;flex-shrink:0;">';
     } else {
       h += '<div style="width:56px;height:56px;background:var(--clr-surface);border-radius:6px;' +
            'display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
@@ -234,6 +234,12 @@ $_mpCodigos   = $mpCodigos   ?? [];
     document.body.style.overflow = '';
   };
 
+  /* Permite inyectar códigos en tiempo de ejecución desde otras páginas
+     (ej. perfil.php tras una devolución parcial exitosa). */
+  window._mpSetCodigos = function (pedidoId, productos) {
+    _codigosRuntime[pedidoId] = productos;
+  };
+
   /* ─── Confirmación AJAX ─── */
   btnConf.addEventListener('click', function () {
     btnConf.disabled  = true;
@@ -258,9 +264,9 @@ $_mpCodigos   = $mpCodigos   ?? [];
         stepA.style.display = 'none';
         stepB.style.display = '';
 
-        /* Notificar a la página que lo incluyó */
+        /* Notificar a la página que lo incluyó (data completo como tercer arg) */
         if (typeof window._mpOnConfirm === 'function') {
-          window._mpOnConfirm(activePedidoId, data.productos);
+          window._mpOnConfirm(activePedidoId, data.productos, data);
         }
       } else {
         btnConf.disabled  = false;

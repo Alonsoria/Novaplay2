@@ -100,7 +100,8 @@ $stmtD->close();
 /* ── Pedidos del usuario ── */
 $pedidos = [];
 $stmtPed = $conn->prepare(
-    "SELECT id_pedido, total, estado, fecha, confirmado FROM pedidos
+    "SELECT id_pedido, total, COALESCE(monto_devuelto, 0) AS monto_devuelto,
+            estado, fecha, confirmado FROM pedidos
      WHERE id_usuario = ? ORDER BY fecha DESC LIMIT 20"
 );
 $stmtPed->bind_param("i", $uid);
@@ -129,11 +130,11 @@ if (!empty($pedidos)) {
     $placeholders = implode(',', array_fill(0, count($idsPedidos), '?'));
     $types        = str_repeat('i', count($idsPedidos));
     $stmtCod      = $conn->prepare(
-        "SELECT ca.id_pedido, ca.nombre_producto, ca.imagen_producto, ca.codigo,
+        "SELECT ca.id AS codigo_id, ca.id_pedido, ca.nombre_producto, ca.imagen_producto, ca.codigo,
                 COALESCE(GROUP_CONCAT(DISTINCT pp.id_plataforma ORDER BY pp.id_plataforma SEPARATOR ','), '') AS plataformas
          FROM codigos_activacion ca
          LEFT JOIN producto_plataforma pp ON ca.id_producto = pp.id_producto
-         WHERE ca.id_pedido IN ($placeholders)
+         WHERE ca.id_pedido IN ($placeholders) AND ca.devuelto = 0
          GROUP BY ca.id, ca.id_pedido, ca.nombre_producto, ca.imagen_producto, ca.codigo
          ORDER BY ca.id"
     );
@@ -146,6 +147,7 @@ if (!empty($pedidos)) {
             ? array_map('intval', explode(',', $row['plataformas']))
             : [];
         $productosPorPedido[$pid][] = [
+            'codigo_id'       => (int)$row['codigo_id'],
             'nombre_producto' => $row['nombre_producto'],
             'imagen_producto' => $row['imagen_producto'],
             'plataformas'     => $plats,
@@ -349,24 +351,35 @@ try {
               <?php
               $numActual = min($totalPedidos, count($pedidos));
               foreach ($pedidos as $ped):
-                $pidInt     = (int)$ped['id_pedido'];
-                $numDisplay = $numActual--;
-                $conf       = (int)$ped['confirmado'];
+                $pidInt        = (int)$ped['id_pedido'];
+                $numDisplay    = $numActual--;
+                $conf          = (int)$ped['confirmado'];
+                $totalEfectivo = max(0.0, (float)$ped['total'] - (float)($ped['monto_devuelto'] ?? 0));
               ?>
                 <tr data-pedido="<?= $pidInt ?>"
                     data-numero="<?= $numDisplay ?>"
                     data-confirmado="<?= $conf ?>"
                     <?= ($conf && $ped['estado'] === 'pagado') ? 'style="cursor:pointer;"' : '' ?>>
                   <td>#<?= $numDisplay ?></td>
-                  <td>$<?= number_format((float)$ped['total'], 2) ?></td>
+                  <td class="pedido-total-td" data-pedido="<?= $pidInt ?>">
+                    $<?= number_format($totalEfectivo, 2) ?>
+                  </td>
                   <td style="color:var(--clr-text-muted);font-size:.85rem;">
                     <?= date('d/m/Y H:i', strtotime($ped['fecha'])) ?>
                   </td>
                   <td id="accion-td-<?= $pidInt ?>">
-                    <?php if ($ped['estado'] === 'reembolsado'): ?>
-                      <span style="color:var(--clr-warning);font-size:.88rem;">
-                        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Reembolsado
-                      </span>
+                    <?php if ($ped['estado'] === 'reembolsado' && $conf): ?>
+                      <button type="button"
+                              class="btn-confirmar-prod"
+                              data-pedido="<?= $pidInt ?>"
+                              data-numero="<?= $numDisplay ?>"
+                              style="background:none;border:1px solid var(--clr-accent);
+                                     border-radius:6px;padding:4px 9px;color:var(--clr-accent);
+                                     font-size:.78rem;cursor:pointer;white-space:nowrap;">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i> Ver códigos
+                      </button>
+                    <?php elseif ($ped['estado'] === 'reembolsado'): ?>
+                      <span style="color:var(--clr-border);font-size:.85rem;">—</span>
                     <?php elseif ($ped['estado'] === 'pagado' && !$conf): ?>
                       <button type="button"
                               class="btn-confirmar-prod"
@@ -386,7 +399,15 @@ try {
                     <?php endif; ?>
                   </td>
                   <td id="devolver-td-<?= $pidInt ?>">
-                    <?php if ($ped['estado'] === 'pagado' && !$conf): ?>
+                    <?php if ($ped['estado'] === 'reembolsado' && $conf): ?>
+                      <span style="color:var(--clr-warning);font-size:.85rem;white-space:nowrap;">
+                        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Parcial
+                      </span>
+                    <?php elseif ($ped['estado'] === 'reembolsado'): ?>
+                      <span style="color:var(--clr-warning);font-size:.88rem;white-space:nowrap;">
+                        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Reembolsado
+                      </span>
+                    <?php elseif ($ped['estado'] === 'pagado' && !$conf): ?>
                       <button type="button"
                               class="btn-devolver"
                               data-pedido="<?= $pidInt ?>"
@@ -480,11 +501,15 @@ try {
       <div id="dev-step2" style="display:none;">
         <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);
                     border-radius:10px;padding:18px;margin-bottom:16px;text-align:center;">
-          <i class="fa-solid fa-circle-info"
+          <i class="fa-solid fa-triangle-exclamation"
              style="font-size:2rem;color:var(--clr-warning);margin-bottom:10px;display:block;"
              aria-hidden="true"></i>
-          <p style="color:var(--clr-white);font-size:.95rem;line-height:1.6;margin:0;">
-            Tu devolución será revisada y se te confirmará al correo registrado.
+          <p style="color:var(--clr-white);font-size:.93rem;line-height:1.6;margin:0 0 6px;font-weight:600;">
+            Una vez confirmada la devolución, esta opción dejará de estar disponible
+            y el resto de tu pedido se marcará como confirmado automáticamente.
+          </p>
+          <p style="color:var(--clr-text-muted);font-size:.84rem;margin:0;">
+            El reembolso se procesará en 1–3 días hábiles a tu método de pago original.
           </p>
         </div>
         <div id="dev-resumen" style="margin-bottom:16px;font-size:.85rem;color:var(--clr-text-muted);"></div>
@@ -540,8 +565,8 @@ try {
 
 /* ── Bindings de perfil para el modal compartido de pedido ── */
 (function () {
-  /* Callback: actualizar fila de la tabla tras confirmar */
-  window._mpOnConfirm = function (pid) {
+  /* Callback: actualizar fila de la tabla tras confirmar (y actualizar puntos si la respuesta los trae) */
+  window._mpOnConfirm = function (pid, prods, resp) {
     var row = document.querySelector('tr[data-pedido="' + pid + '"]');
     if (row) { row.dataset.confirmado = '1'; row.style.cursor = 'pointer'; }
     var accionTd = document.getElementById('accion-td-' + pid);
@@ -552,29 +577,36 @@ try {
     }
     var devolverTd = document.getElementById('devolver-td-' + pid);
     if (devolverTd) {
-      devolverTd.innerHTML =
-        '<span style="color:var(--clr-border);font-size:.85rem;">—</span>';
+      devolverTd.innerHTML = '<span style="color:var(--clr-border);font-size:.85rem;">—</span>';
+    }
+    /* Actualizar puntos si la respuesta los incluye */
+    if (resp && resp.puntos !== undefined) {
+      var fmt = new Intl.NumberFormat('es-MX').format(resp.puntos);
+      var ptsEl = document.getElementById('perfil-puntos-val');
+      if (ptsEl) ptsEl.textContent = fmt + ' pts';
+      var hdrEl = document.getElementById('header-pts-val');
+      if (hdrEl) hdrEl.textContent = fmt + ' puntos';
     }
   };
 
-  /* Click en filas ya confirmadas (event delegation) */
+  /* Event delegation para toda la tabla — clic en filas confirmadas y botones */
   var tbody = document.getElementById('pedidos-tbody');
   if (tbody) {
     tbody.addEventListener('click', function (e) {
+      /* Botón "Confirmar productos" o "Ver códigos" (incluyendo los creados dinámicamente) */
+      var btnConf = e.target.closest('.btn-confirmar-prod');
+      if (btnConf) {
+        e.stopPropagation();
+        window.abrirModalPedido(parseInt(btnConf.dataset.pedido, 10), btnConf.dataset.numero);
+        return;
+      }
+      /* Clic en la fila de un pedido ya confirmado */
       if (e.target.closest('button')) return;
       var row = e.target.closest('tr');
       if (!row || row.dataset.confirmado !== '1') return;
       window.abrirModalPedido(parseInt(row.dataset.pedido, 10), row.dataset.numero);
     });
   }
-
-  /* Botones "Confirmar productos" */
-  document.querySelectorAll('.btn-confirmar-prod').forEach(function (btn) {
-    btn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      window.abrirModalPedido(parseInt(btn.dataset.pedido, 10), btn.dataset.numero);
-    });
-  });
 })();
 
 /* ── Modal de devolución ── */
@@ -586,8 +618,18 @@ try {
   const checkboxesEl = document.getElementById('dev-checkboxes');
   const pedidoRef    = document.getElementById('dev-pedido-ref');
 
-  let activePedidoId = null;
-  let selectedProds  = [];
+  let activePedidoId   = null;
+  let activeNumDisplay = null;
+  let selectedIds      = [];   /* IDs de codigos_activacion a devolver */
+  let selectedProds    = [];   /* nombres para el resumen visual */
+
+  const devPlatImages = {
+    1: 'images/plataformas/xboxlogo.png',
+    2: 'images/plataformas/playstationlogo.png',
+    3: 'images/plataformas/steamlogo.png',
+    4: 'images/plataformas/nintendologo.png',
+  };
+  const devPlatNames = { 1: 'Xbox', 2: 'PlayStation', 3: 'Steam', 4: 'Nintendo' };
 
   function escHtml(str) {
     return String(str)
@@ -595,28 +637,67 @@ try {
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  /* Tarjeta de producto con checkbox para el modal de devolución */
+  function devProdCard(item) {
+    var nombre    = item.nombre_producto;
+    var imagen    = item.imagen_producto;
+    var plats     = item.plataformas || [];
+    var codigoId  = item.codigo_id;
+
+    var labelStyle = 'display:flex;align-items:center;gap:12px;cursor:pointer;' +
+                     'background:var(--clr-surface-2);padding:10px 14px;border-radius:8px;' +
+                     'border:1px solid var(--clr-border);transition:border-color .15s;';
+    var cbStyle    = 'accent-color:var(--clr-accent);width:16px;height:16px;flex-shrink:0;cursor:pointer;';
+
+    var h = '<label style="' + labelStyle + '">';
+    /* value = ID del registro en codigos_activacion; data-nombre = para el resumen */
+    h += '<input type="checkbox" name="dev_prod" value="' + codigoId + '" data-nombre="' + escHtml(nombre) + '" style="' + cbStyle + '">';
+
+    /* Imagen del producto */
+    if (imagen) {
+      h += '<img src="' + escHtml(imagen) + '" alt="' + escHtml(nombre) + '"' +
+           ' style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0;">';
+    } else {
+      h += '<div style="width:48px;height:48px;background:var(--clr-surface);border-radius:6px;' +
+           'display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+           '<i class="fa-solid fa-gamepad" style="color:var(--clr-accent);font-size:1.2rem;"></i></div>';
+    }
+
+    /* Nombre y plataformas */
+    h += '<div style="flex:1;min-width:0;">';
+    h += '<div style="font-weight:600;color:var(--clr-white);font-size:.9rem;' +
+         'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(nombre) + '</div>';
+    if (plats.length) {
+      h += '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:5px;">';
+      plats.forEach(function (pid) {
+        var img  = devPlatImages[pid];
+        var name = devPlatNames[pid] || ('Plataforma ' + pid);
+        if (img) {
+          h += '<img src="' + img + '" alt="' + name + '" title="' + name + '"' +
+               ' style="height:16px;width:auto;object-fit:contain;opacity:.85;">';
+        }
+      });
+      h += '</div>';
+    }
+    h += '</div></label>';
+    return h;
+  }
+
   function abrir(pedidoId, numDisplay) {
-    activePedidoId       = pedidoId;
+    activePedidoId   = pedidoId;
+    activeNumDisplay = numDisplay;
     pedidoRef.textContent = 'Pedido #' + numDisplay;
 
-    const lista   = codigosDevol[pedidoId] || [];
-    const nombres = [...new Set(lista.map(function (i) { return i.nombre_producto; }))];
-    const itemStyle = 'display:flex;align-items:center;gap:10px;cursor:pointer;' +
-                      'background:var(--clr-surface-2);padding:10px 14px;border-radius:8px;' +
-                      'border:1px solid var(--clr-border);';
-    const cbStyle   = 'accent-color:var(--clr-accent);width:16px;height:16px;flex-shrink:0;';
-    const txtStyle  = 'color:var(--clr-white);font-size:.9rem;';
+    const lista = codigosDevol[pedidoId] || [];
 
-    if (nombres.length === 0) {
+    if (lista.length === 0) {
       checkboxesEl.innerHTML =
-        '<label style="' + itemStyle + '">' +
-        '<input type="checkbox" name="dev_prod" value="Pedido completo" checked style="' + cbStyle + '">' +
-        '<span style="' + txtStyle + '">Pedido completo</span></label>';
+        '<p style="color:var(--clr-text-muted);font-size:.9rem;padding:8px 0;">' +
+        'No se encontraron productos para este pedido.</p>';
     } else {
-      checkboxesEl.innerHTML = nombres.map(function (n) {
-        return '<label style="' + itemStyle + '">' +
-          '<input type="checkbox" name="dev_prod" value="' + escHtml(n) + '" style="' + cbStyle + '">' +
-          '<span style="' + txtStyle + '">' + escHtml(n) + '</span></label>';
+      /* Mostrar CADA copia por separado — sin deduplicar */
+      checkboxesEl.innerHTML = lista.map(function (item) {
+        return devProdCard(item);
       }).join('');
     }
 
@@ -632,13 +713,23 @@ try {
       alert('Selecciona al menos un producto.');
       return;
     }
-    selectedProds = checks.map(function (c) { return c.value; });
+
+    /* IDs para el servidor; nombres para mostrar al usuario */
+    selectedIds   = checks.map(function (c) { return parseInt(c.value, 10); });
+    selectedProds = checks.map(function (c) { return c.dataset.nombre || c.value; });
+
+    /* Agrupar para el resumen: "Game X × 2" */
+    const counts = {};
+    selectedProds.forEach(function (n) { counts[n] = (counts[n] || 0) + 1; });
+    const resumenItems = Object.entries(counts).map(function (e) {
+      return e[1] > 1 ? e[0] + ' × ' + e[1] : e[0];
+    });
 
     const resumen = document.getElementById('dev-resumen');
     resumen.innerHTML =
-      '<strong style="color:var(--clr-white);">Productos seleccionados:</strong>' +
+      '<strong style="color:var(--clr-white);">Productos a devolver:</strong>' +
       '<ul style="margin:6px 0 0 18px;padding:0;">' +
-      selectedProds.map(function (p) {
+      resumenItems.map(function (p) {
         return '<li style="color:var(--clr-text-muted);font-size:.85rem;margin-top:4px;">' + escHtml(p) + '</li>';
       }).join('') + '</ul>';
 
@@ -659,25 +750,62 @@ try {
     fetch('solicitar_devolucion.php', {
       method:  'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:    'pedido_id=' + encodeURIComponent(activePedidoId) +
-               '&productos=' + encodeURIComponent(JSON.stringify(selectedProds)),
+      body:    'pedido_id='   + encodeURIComponent(activePedidoId) +
+               '&codigo_ids=' + encodeURIComponent(JSON.stringify(selectedIds)),
     })
     .then(function (r) { return r.json(); })
     .then(function (data) {
       if (data.success) {
-        /* Actualizar celda de acción */
-        var accionTd2 = document.getElementById('accion-td-' + activePedidoId);
-        if (accionTd2) {
-          accionTd2.innerHTML =
-            '<span style="color:var(--clr-warning);font-size:.88rem;">' +
-            '<i class="fa-solid fa-rotate-left"></i> Reembolsado</span>';
-        }
-        /* Ocultar botón de devolución */
+        var accionTd   = document.getElementById('accion-td-'   + activePedidoId);
         var devolverTd = document.getElementById('devolver-td-' + activePedidoId);
-        if (devolverTd) {
-          devolverTd.innerHTML = '<span style="color:var(--clr-border);font-size:.85rem;">—</span>';
+
+        if (data.parcial) {
+          /* Devolución parcial: "Ver códigos" en Acción, "Parcial" en Devolución */
+          if (accionTd) {
+            accionTd.innerHTML =
+              '<button type="button" class="btn-confirmar-prod"' +
+              ' data-pedido="' + activePedidoId + '"' +
+              ' data-numero="' + activeNumDisplay + '"' +
+              ' style="background:none;border:1px solid var(--clr-accent);border-radius:6px;' +
+              'padding:4px 9px;color:var(--clr-accent);font-size:.78rem;cursor:pointer;white-space:nowrap;">' +
+              '<i class="fa-solid fa-eye"></i> Ver códigos</button>';
+          }
+          if (devolverTd) {
+            devolverTd.innerHTML =
+              '<span style="color:var(--clr-warning);font-size:.85rem;white-space:nowrap;">' +
+              '<i class="fa-solid fa-rotate-left"></i> Parcial</span>';
+          }
+          /* Registrar los códigos en el modal compartido para acceso inmediato */
+          if (data.productos && typeof window._mpSetCodigos === 'function') {
+            window._mpSetCodigos(activePedidoId, data.productos);
+          }
+          /* Actualizar data-confirmado de la fila */
+          var row = document.querySelector('tr[data-pedido="' + activePedidoId + '"]');
+          if (row) { row.dataset.confirmado = '1'; row.style.cursor = 'default'; }
+        } else {
+          /* Devolución total: "—" en Acción, "Reembolsado" en Devolución */
+          if (accionTd) {
+            accionTd.innerHTML =
+              '<span style="color:var(--clr-border);font-size:.85rem;">—</span>';
+          }
+          if (devolverTd) {
+            devolverTd.innerHTML =
+              '<span style="color:var(--clr-warning);font-size:.88rem;white-space:nowrap;">' +
+              '<i class="fa-solid fa-rotate-left"></i> Reembolsado</span>';
+          }
         }
-        /* Actualizar puntos en el banner del perfil y en el header */
+
+        /* Actualizar el total visible en la fila */
+        if (data.total_efectivo !== undefined) {
+          var totalTd = document.querySelector('.pedido-total-td[data-pedido="' + activePedidoId + '"]');
+          if (totalTd) {
+            var fmtT = new Intl.NumberFormat('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2})
+                           .format(data.total_efectivo);
+            totalTd.textContent = '$' + fmtT;
+          }
+        }
+
+        /* Actualizar puntos */
         if (data.puntos !== undefined) {
           var fmt = new Intl.NumberFormat('es-MX').format(data.puntos);
           var ptsEl = document.getElementById('perfil-puntos-val');
@@ -685,6 +813,7 @@ try {
           var hdrEl = document.getElementById('header-pts-val');
           if (hdrEl) hdrEl.textContent = fmt + ' puntos';
         }
+
         step2.innerHTML =
           '<div style="text-align:center;padding:20px 0;">' +
           '<i class="fa-solid fa-circle-check" style="font-size:3rem;color:var(--clr-success, #22c55e);' +
@@ -692,8 +821,10 @@ try {
           '<p style="color:var(--clr-white);font-size:1rem;font-weight:600;margin-bottom:8px;">' +
           '¡Solicitud registrada!</p>' +
           '<p style="color:var(--clr-text-muted);font-size:.88rem;">' +
-          'Recibirás un correo de confirmación con los detalles de tu devolución.</p>' +
-          '</div>';
+          (data.parcial
+            ? 'Los códigos de los productos restantes ya están disponibles.'
+            : 'Recibirás un correo de confirmación con los detalles de tu devolución.') +
+          '</p></div>';
         setTimeout(function () { cerrarModalDevolucion(); }, 3500);
       } else {
         btn.disabled = false;

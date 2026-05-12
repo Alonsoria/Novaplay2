@@ -53,11 +53,11 @@ $mpCodigos = []; /* Aún no confirmado — sin códigos */
   <h2 style="color:var(--clr-success);">¡Pago Exitoso!</h2>
   <p>Tu compra fue procesada correctamente.</p>
 
-  <!-- Cashback ganado -->
+  <!-- Cashback pendiente (se acredita al confirmar) -->
   <?php if ($cashback > 0): ?>
     <p style="font-size:.95rem;color:var(--clr-neon);font-family:var(--font-display);">
       <i class="fa-solid fa-coins" style="color:var(--clr-warning);margin-right:4px;" aria-hidden="true"></i>
-      ¡Ganaste <strong><?= $cashback ?> puntos</strong> de cashback en esta compra!
+      ¡Ganarás <strong><?= $cashback ?> puntos</strong> al confirmar tus productos!
     </p>
   <?php endif; ?>
 
@@ -128,12 +128,20 @@ require_once '_modal_confirmacion.php';
   var pedidoId = <?= (int)$pedidoId ?>;
   if (!pedidoId) return;
 
-  /* Callback: ocultar botón y mostrar mensaje de éxito */
-  window._mpOnConfirm = function () {
+  /* Callback: ocultar botón y mostrar mensaje de éxito con puntos ganados */
+  window._mpOnConfirm = function (pid, prods, resp) {
     var btn = document.getElementById('suc-btn-confirmar');
     if (btn) btn.style.display = 'none';
     var msg = document.getElementById('suc-confirmado-msg');
-    if (msg) msg.style.display = '';
+    if (msg) {
+      if (resp && resp.cashback > 0) {
+        msg.innerHTML =
+          '<i class="fa-solid fa-circle-check" aria-hidden="true"></i>' +
+          ' ¡Confirmado! Ganaste <strong>' + resp.cashback + ' puntos</strong>. ' +
+          'Revisa tu correo para una copia de tus códigos.';
+      }
+      msg.style.display = '';
+    }
   };
 
   /* Botón "Confirmar mis productos" → abre el modal compartido */

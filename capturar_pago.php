@@ -80,27 +80,8 @@ foreach ($cartItems as $item) {
     }
 }
 
-/* Cashback: 10% del total como puntos */
-$cashback    = (int)floor($total * 0.10);
-$mesCurrent  = date('Y-m');
-
-$stmtMes = $conn->prepare("SELECT puntos_reset_mes FROM usuarios WHERE id_usuario = ?");
-$stmtMes->bind_param("i", $uid);
-$stmtMes->execute();
-$mesBD = $stmtMes->get_result()->fetch_assoc()['puntos_reset_mes'] ?? '';
-$stmtMes->close();
-
-if ($mesBD !== $mesCurrent) {
-    $stmtR = $conn->prepare("UPDATE usuarios SET puntos = ?, puntos_reset_mes = ? WHERE id_usuario = ?");
-    $stmtR->bind_param("isi", $cashback, $mesCurrent, $uid);
-    $stmtR->execute();
-    $stmtR->close();
-} else {
-    $stmtC = $conn->prepare("UPDATE usuarios SET puntos = puntos + ? WHERE id_usuario = ?");
-    $stmtC->bind_param("ii", $cashback, $uid);
-    $stmtC->execute();
-    $stmtC->close();
-}
+/* Cashback potencial (se acredita al confirmar el pedido, no aquí) */
+$cashback = (int)floor($total * 0.10);
 
 /* ── Deducir puntos usados (guardados en sesión por crear_pago.php) ── */
 $puntosUsadosPP = (int)($_SESSION['puntos_usados_paypal'] ?? 0);
@@ -117,7 +98,7 @@ $conn->query("DELETE FROM carrito WHERE id_usuario = $uid");
 
 /* Notificación */
 try {
-    $msg    = "Pago de $$total procesado con PayPal. Ganaste $cashback puntos de cashback.";
+    $msg    = "Pago de $$total procesado con PayPal. Confirma tu pedido para ganar $cashback puntos.";
     $stmtN  = $conn->prepare("INSERT INTO notificaciones (id_usuario, mensaje) VALUES (?, ?)");
     $stmtN->bind_param("is", $uid, $msg);
     $stmtN->execute();

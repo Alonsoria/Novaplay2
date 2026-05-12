@@ -135,7 +135,7 @@ if (!empty($_SESSION['pago_error'])) {
                   ?>
                   <div class="product-cell">
                     <?php if (!empty($item['imagen'])): ?>
-                      <img src="<?= e($item['imagen']) ?>" alt="<?= e($item['nombre']) ?>">
+                      <img src="<?= e($item['imagen']) ?>" alt="<?= e($item['nombre']) ?>" class="cart-prod-img">
                     <?php endif; ?>
                     <span>
                       <?= e($item['nombre']) ?>
@@ -153,7 +153,7 @@ if (!empty($_SESSION['pago_error'])) {
                             <img src="<?= e($pInfo['src']) ?>"
                                  alt="<?= e($pInfo['name']) ?>"
                                  title="<?= e($pInfo['name']) ?>"
-                                 class="plat-thumb">
+                                 class="cart-plat-icon">
                           <?php endforeach; ?>
                         </div>
                       <?php endif; ?>
