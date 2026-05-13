@@ -69,7 +69,7 @@ $mpCodigos = []; /* Aún no confirmado — sin códigos */
       <i class="fa-solid fa-key"
          style="font-size:2rem;color:var(--clr-accent);margin-bottom:10px;display:block;"
          aria-hidden="true"></i>
-      <p style="color:var(--clr-white);font-size:.95rem;font-weight:600;margin:0 0 6px;">
+      <p class="suc-prod-title" style="color:var(--clr-white);font-size:.95rem;font-weight:600;margin:0 0 6px;">
         Tus productos están listos
       </p>
       <p style="color:var(--clr-text-muted);font-size:.87rem;margin:0 0 18px;line-height:1.5;">

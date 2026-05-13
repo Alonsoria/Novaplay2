@@ -391,9 +391,15 @@ try {
                         <i class="fa-solid fa-unlock" aria-hidden="true"></i> Confirmar productos
                       </button>
                     <?php elseif ($ped['estado'] === 'pagado' && $conf): ?>
-                      <span style="color:var(--clr-accent);font-size:.85rem;">
+                      <button type="button"
+                              class="btn-confirmar-prod"
+                              data-pedido="<?= $pidInt ?>"
+                              data-numero="<?= $numDisplay ?>"
+                              style="background:none;border:1px solid var(--clr-accent);
+                                     border-radius:6px;padding:4px 9px;color:var(--clr-accent);
+                                     font-size:.78rem;cursor:pointer;white-space:nowrap;">
                         <i class="fa-solid fa-eye" aria-hidden="true"></i> Ver códigos
-                      </span>
+                      </button>
                     <?php else: ?>
                       <span style="color:var(--clr-border);font-size:.85rem;">—</span>
                     <?php endif; ?>
@@ -437,7 +443,7 @@ try {
       <h3 style="margin-bottom:var(--space-lg);">Tarjetas guardadas</h3>
       <ul style="list-style:none;display:flex;flex-direction:column;gap:var(--space-md);">
         <?php foreach ($tarjetas as $tar): ?>
-          <li style="display:flex;align-items:center;gap:var(--space-md);background:var(--clr-surface-2);border:1px solid var(--clr-border);border-radius:var(--radius-md);padding:var(--space-md);">
+          <li style="display:flex;align-items:center;gap:var(--space-md);background:rgba(0,0,0,.7);border:1px solid var(--clr-border);border-radius:var(--radius-md);padding:var(--space-md);">
             <i class="fa-brands fa-<?= strtolower($tar['marca']) === 'visa' ? 'cc-visa' : (strtolower($tar['marca']) === 'mastercard' ? 'cc-mastercard' : 'credit-card') ?>"
                style="font-size:2rem;color:var(--clr-accent-2);" aria-hidden="true"></i>
             <div style="flex:1;">
@@ -470,7 +476,7 @@ try {
       </button>
 
       <h3 id="dev-titulo"
-          style="margin-bottom:4px;font-family:var(--font-display);font-size:1.15rem;color:var(--clr-white);">
+          style="margin-bottom:4px;font-family:var(--font-display);font-size:1.15rem;color:var(--clr-text);">
         <i class="fa-solid fa-rotate-left" style="color:var(--clr-warning);margin-right:8px;" aria-hidden="true"></i>
         Solicitar devolución
       </h3>
@@ -504,7 +510,7 @@ try {
           <i class="fa-solid fa-triangle-exclamation"
              style="font-size:2rem;color:var(--clr-warning);margin-bottom:10px;display:block;"
              aria-hidden="true"></i>
-          <p style="color:var(--clr-white);font-size:.93rem;line-height:1.6;margin:0 0 6px;font-weight:600;">
+          <p style="color:var(--clr-text);font-size:.93rem;line-height:1.6;margin:0 0 6px;font-weight:600;">
             Una vez confirmada la devolución, esta opción dejará de estar disponible
             y el resto de tu pedido se marcará como confirmado automáticamente.
           </p>
@@ -572,8 +578,12 @@ try {
     var accionTd = document.getElementById('accion-td-' + pid);
     if (accionTd) {
       accionTd.innerHTML =
-        '<span style="color:var(--clr-accent);font-size:.85rem;">' +
-        '<i class="fa-solid fa-eye"></i> Ver códigos</span>';
+        '<button type="button" class="btn-confirmar-prod"' +
+        ' data-pedido="' + pid + '"' +
+        ' data-numero="' + (row ? row.dataset.numero || '' : '') + '"' +
+        ' style="background:none;border:1px solid var(--clr-accent);border-radius:6px;' +
+        'padding:4px 9px;color:var(--clr-accent);font-size:.78rem;cursor:pointer;white-space:nowrap;">' +
+        '<i class="fa-solid fa-eye"></i> Ver códigos</button>';
     }
     var devolverTd = document.getElementById('devolver-td-' + pid);
     if (devolverTd) {
@@ -644,28 +654,28 @@ try {
     var plats     = item.plataformas || [];
     var codigoId  = item.codigo_id;
 
-    var labelStyle = 'display:flex;align-items:center;gap:12px;cursor:pointer;' +
-                     'background:var(--clr-surface-2);padding:10px 14px;border-radius:8px;' +
+    var labelStyle = 'display:flex;align-items:flex-start;gap:12px;cursor:pointer;' +
+                     'background:rgba(0,0,0,.7);padding:12px 14px;border-radius:10px;' +
                      'border:1px solid var(--clr-border);transition:border-color .15s;';
     var cbStyle    = 'accent-color:var(--clr-accent);width:16px;height:16px;flex-shrink:0;cursor:pointer;';
 
-    var h = '<label style="' + labelStyle + '">';
+    var h = '<label class="mp-prod-card" style="' + labelStyle + '">';
     /* value = ID del registro en codigos_activacion; data-nombre = para el resumen */
     h += '<input type="checkbox" name="dev_prod" value="' + codigoId + '" data-nombre="' + escHtml(nombre) + '" style="' + cbStyle + '">';
 
     /* Imagen del producto */
     if (imagen) {
       h += '<img src="' + escHtml(imagen) + '" alt="' + escHtml(nombre) + '"' +
-           ' style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0;">';
+           ' style="width:60px;height:80px;object-fit:cover;border-radius:6px;flex-shrink:0;">';
     } else {
-      h += '<div style="width:48px;height:48px;background:var(--clr-surface);border-radius:6px;' +
+      h += '<div style="width:56px;height:56px;background:var(--clr-surface);border-radius:6px;' +
            'display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
-           '<i class="fa-solid fa-gamepad" style="color:var(--clr-accent);font-size:1.2rem;"></i></div>';
+           '<i class="fa-solid fa-gamepad" style="color:var(--clr-accent);font-size:1.4rem;"></i></div>';
     }
 
     /* Nombre y plataformas */
     h += '<div style="flex:1;min-width:0;">';
-    h += '<div style="font-weight:600;color:var(--clr-white);font-size:.9rem;' +
+    h += '<div class="mp-prod-name" style="font-weight:600;color:var(--clr-white);font-size:.95rem;' +
          'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(nombre) + '</div>';
     if (plats.length) {
       h += '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:5px;">';
@@ -674,7 +684,7 @@ try {
         var name = devPlatNames[pid] || ('Plataforma ' + pid);
         if (img) {
           h += '<img src="' + img + '" alt="' + name + '" title="' + name + '"' +
-               ' style="height:16px;width:auto;object-fit:contain;opacity:.85;">';
+               ' style="height:22px;width:auto;object-fit:contain;opacity:.9;filter:drop-shadow(0 0 2px rgba(0,0,0,.4));">';
         }
       });
       h += '</div>';
@@ -727,7 +737,7 @@ try {
 
     const resumen = document.getElementById('dev-resumen');
     resumen.innerHTML =
-      '<strong style="color:var(--clr-white);">Productos a devolver:</strong>' +
+      '<strong style="color:var(--clr-text);">Productos a devolver:</strong>' +
       '<ul style="margin:6px 0 0 18px;padding:0;">' +
       resumenItems.map(function (p) {
         return '<li style="color:var(--clr-text-muted);font-size:.85rem;margin-top:4px;">' + escHtml(p) + '</li>';
@@ -818,7 +828,7 @@ try {
           '<div style="text-align:center;padding:20px 0;">' +
           '<i class="fa-solid fa-circle-check" style="font-size:3rem;color:var(--clr-success, #22c55e);' +
           'margin-bottom:16px;display:block;" aria-hidden="true"></i>' +
-          '<p style="color:var(--clr-white);font-size:1rem;font-weight:600;margin-bottom:8px;">' +
+          '<p style="color:var(--clr-text);font-size:1rem;font-weight:600;margin-bottom:8px;">' +
           '¡Solicitud registrada!</p>' +
           '<p style="color:var(--clr-text-muted);font-size:.88rem;">' +
           (data.parcial

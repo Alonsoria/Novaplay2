@@ -204,7 +204,7 @@ if (!empty($_SESSION['pago_error'])) {
                border-radius:10px;">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
               <i class="fa-solid fa-star" style="color:var(--clr-warning);" aria-hidden="true"></i>
-              <span style="font-size:.88rem;font-weight:600;color:var(--clr-white);">
+              <span style="font-size:.88rem;font-weight:600;color:var(--clr-text);">
                 Tus puntos: <strong style="color:var(--clr-neon);"><?= number_format($userPuntos) ?></strong>
                 <span style="color:var(--clr-text-muted);font-weight:400;">(1 punto = $1 MXN)</span>
               </span>
@@ -241,7 +241,7 @@ if (!empty($_SESSION['pago_error'])) {
                        placeholder="Puntos a usar"
                        style="flex:1;padding:6px 10px;border-radius:6px;
                               border:1px solid var(--clr-border);
-                              background:var(--clr-surface-2);color:var(--clr-white);
+                              background:var(--clr-surface-2);color:var(--clr-text);
                               font-size:.85rem;"
                        aria-label="Cantidad de puntos a canjear">
                 <button type="submit"
@@ -277,7 +277,7 @@ if (!empty($_SESSION['pago_error'])) {
           <?php endif; ?>
 
           <div class="cart-summary-row">
-            <span class="label" style="font-weight:700;color:var(--clr-white);">Total</span>
+            <span class="label" style="font-weight:700;color:var(--clr-text);">Total</span>
             <span class="total" id="cartTotalFinal">$<?= number_format($totalFinal, 2) ?></span>
           </div>
 

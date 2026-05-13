@@ -83,13 +83,13 @@ if (!empty($_SESSION['pago_error'])) {
       <div class="payment-security-badge">
         <i class="fa-solid fa-shield-halved" style="color:var(--clr-success);font-size:1.2rem;" aria-hidden="true"></i>
         <div>
-          <div style="font-weight:700;font-size:.85rem;color:var(--clr-white);">Pago 100% seguro</div>
+          <div style="font-weight:700;font-size:.85rem;color:var(--clr-text);">Pago 100% seguro</div>
           <div style="font-size:.75rem;color:var(--clr-text-muted);">Cifrado SHA-256 · PCI DSS</div>
         </div>
         <div style="display:flex;gap:var(--space-sm);margin-left:auto;opacity:.7;">
-          <i class="fa-brands fa-cc-visa" style="font-size:1.6rem;color:var(--clr-white);" aria-label="Visa"></i>
-          <i class="fa-brands fa-cc-mastercard" style="font-size:1.6rem;color:var(--clr-white);" aria-label="Mastercard"></i>
-          <i class="fa-brands fa-cc-amex" style="font-size:1.6rem;color:var(--clr-white);" aria-label="Amex"></i>
+          <i class="fa-brands fa-cc-visa" style="font-size:1.6rem;color:var(--clr-text);" aria-label="Visa"></i>
+          <i class="fa-brands fa-cc-mastercard" style="font-size:1.6rem;color:var(--clr-text);" aria-label="Mastercard"></i>
+          <i class="fa-brands fa-cc-amex" style="font-size:1.6rem;color:var(--clr-text);" aria-label="Amex"></i>
         </div>
       </div>
     </div>

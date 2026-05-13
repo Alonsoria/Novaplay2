@@ -100,6 +100,15 @@ if (is_logged_in()) {
   <!-- AOS — Animate On Scroll -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
   <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+  <!-- Aplicar tema guardado antes de renderizar (evita parpadeo) -->
+  <script>
+    (function(){
+      try {
+        if (localStorage.getItem('nv-theme') === 'light')
+          document.documentElement.classList.add('light-mode');
+      } catch(e){}
+    })();
+  </script>
   <style>
     /* ── Tooltips del sidebar ── */
     .sidebar-icon[data-tooltip] { position: relative; }
@@ -226,6 +235,11 @@ if (is_logged_in()) {
 
     <a href="combos.php">Combos</a>
 
+    <!-- Toggle modo oscuro / claro -->
+    <button class="theme-toggle-btn" onclick="novaToggleTheme()" aria-label="Cambiar a modo claro" title="Cambiar a modo claro">
+      <i class="fa-solid fa-sun" aria-hidden="true"></i>
+    </button>
+
     <?php if (is_logged_in()): ?>
       <a href="recompensaDiaria.php" title="Recompensa Diaria">
         <i class="fa-solid fa-gift" aria-hidden="true"></i>
@@ -261,6 +275,10 @@ if (is_logged_in()) {
 
   <!-- Acciones rápidas (derecha del header, solo en móvil) -->
   <div class="site-header__actions">
+    <!-- Toggle modo oscuro / claro (mobile) -->
+    <button class="theme-toggle-btn" onclick="novaToggleTheme()" aria-label="Cambiar a modo claro" title="Cambiar a modo claro">
+      <i class="fa-solid fa-sun" aria-hidden="true"></i>
+    </button>
     <a href="carrito.php" class="site-header__action-btn site-header__action-cart" aria-label="Carrito" style="position:relative;">
       <i class="fa-solid fa-cart-shopping"></i>
       <?php if ($cartCount > 0): ?>
@@ -436,7 +454,7 @@ if (is_logged_in()) {
                   <?php foreach ($codigosNotif[$pedId] as $cod):
                     $fmt = implode('-', str_split($cod['codigo'], 4));
                   ?>
-                    <li style="background:var(--clr-surface-2);border-radius:8px;padding:8px 10px;">
+                    <li style="background:rgba(0,0,0,.7);border-radius:8px;padding:8px 10px;">
                       <div style="font-size:.78rem;color:var(--clr-text-muted);margin-bottom:3px;">
                         <?= e($cod['nombre_producto']) ?>
                       </div>

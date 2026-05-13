@@ -16,10 +16,10 @@ define('DB_CHARSET', 'utf8mb4');
 define('SITE_URL', getenv('SITE_URL') ?: 'http://localhost/Novaplay2');
 
 /* ── Configuración SMTP ── */
-define('MAIL_HOST',      'sandbox.smtp.mailtrap.io');
-define('MAIL_PORT',      2525);
-define('MAIL_USER',      '13c3c3cfec37f1');
-define('MAIL_PASS',      '117747fde13ee1');
+define('MAIL_HOST',      'smtp-relay.brevo.com');
+define('MAIL_PORT',      587);
+define('MAIL_USER',      'ab219d001@smtp-brevo.com');
+define('MAIL_PASS',      'xsmtpsib-78692606ae58b79bff438ee20e793948718051ca98ddfcc2302a4c18004b58e8-eMY4wDGnlCv5ekAw');
 define('MAIL_FROM',      'noreply@novaplay.com.mx');
 define('MAIL_FROM_NAME', 'Novaplay');
 

@@ -34,7 +34,7 @@ $_mpCodigos   = $mpCodigos   ?? [];
     </button>
 
     <h3 id="mp-titulo"
-        style="margin-bottom:4px;font-family:var(--font-display);font-size:1.15rem;color:var(--clr-white);">
+        style="margin-bottom:4px;font-family:var(--font-display);font-size:1.15rem;color:var(--clr-text);">
       <i class="fa-solid fa-box" style="color:var(--clr-accent);margin-right:8px;" aria-hidden="true"></i>
       Pedido
     </h3>
@@ -50,7 +50,7 @@ $_mpCodigos   = $mpCodigos   ?? [];
         <i class="fa-solid fa-lock"
            style="font-size:1.6rem;color:var(--clr-accent);margin-bottom:8px;display:block;"
            aria-hidden="true"></i>
-        <p style="color:var(--clr-white);font-size:.9rem;line-height:1.6;margin:0 0 4px;">
+        <p style="color:var(--clr-text);font-size:.9rem;line-height:1.6;margin:0 0 4px;">
           Revisa y confirma bien la plataforma de canjeo, ¡no es posible revertir esta acción!
         </p>
         <p style="color:var(--clr-text-muted);font-size:.82rem;margin:0;">
@@ -128,8 +128,8 @@ $_mpCodigos   = $mpCodigos   ?? [];
 
   /* Tarjeta de producto (reutilizada en step A y step B) */
   function prodCard(item, showCode) {
-    let h = '<div style="display:flex;align-items:flex-start;gap:12px;' +
-            'background:var(--clr-surface-2);border:1px solid var(--clr-border);' +
+    let h = '<div class="mp-prod-card" style="display:flex;align-items:flex-start;gap:12px;' +
+            'background:rgba(0,0,0,.7);border:1px solid var(--clr-border);' +
             'border-radius:10px;padding:12px 14px;">';
 
     /* Imagen */
@@ -146,7 +146,7 @@ $_mpCodigos   = $mpCodigos   ?? [];
     h += '<div style="flex:1;min-width:0;">';
 
     /* Nombre */
-    h += '<div style="font-weight:600;color:var(--clr-white);font-size:.95rem;' +
+    h += '<div class="mp-prod-name" style="font-weight:600;color:var(--clr-white);font-size:.95rem;' +
          'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
          escHtml(item.nombre_producto) + '</div>';
 
@@ -168,7 +168,7 @@ $_mpCodigos   = $mpCodigos   ?? [];
     /* Código (solo en step B) */
     if (showCode && item.codigo) {
       h += '<div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
-           '<span style="font-family:monospace;color:var(--clr-neon);font-size:.95rem;letter-spacing:1px;">' +
+           '<span class="mp-prod-code" style="font-family:monospace;color:var(--clr-neon);font-size:.95rem;letter-spacing:1px;">' +
            escHtml(fmtCode(item.codigo)) + '</span>' +
            '<button data-raw="' + escHtml(item.codigo) + '" class="btn-copiar-cod"' +
            ' style="background:none;border:1px solid var(--clr-border);border-radius:6px;' +

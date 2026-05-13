@@ -319,6 +319,51 @@
   });
 })();
 
+/* ─── Toggle modo claro / oscuro ─── */
+window.novaToggleTheme = function () {
+  var html = document.documentElement;
+  var isLight = html.classList.contains('light-mode');
+  var next = isLight ? 'dark' : 'light';
+
+  /* Transición fluida */
+  html.classList.add('theme-transitioning');
+  setTimeout(function () { html.classList.remove('theme-transitioning'); }, 500);
+
+  if (next === 'light') {
+    html.classList.add('light-mode');
+  } else {
+    html.classList.remove('light-mode');
+  }
+
+  /* Actualizar todos los botones */
+  document.querySelectorAll('.theme-toggle-btn').forEach(function (btn) {
+    if (next === 'light') {
+      btn.innerHTML = '<i class="fa-solid fa-moon" aria-hidden="true"></i>';
+      btn.title = 'Cambiar a modo oscuro';
+      btn.setAttribute('aria-label', 'Cambiar a modo oscuro');
+    } else {
+      btn.innerHTML = '<i class="fa-solid fa-sun" aria-hidden="true"></i>';
+      btn.title = 'Cambiar a modo claro';
+      btn.setAttribute('aria-label', 'Cambiar a modo claro');
+    }
+  });
+
+  try { localStorage.setItem('nv-theme', next); } catch (e) {}
+};
+
+/* Sincronizar iconos al cargar con el tema ya aplicado por el <head> */
+(function () {
+  var saved = 'dark';
+  try { saved = localStorage.getItem('nv-theme') || 'dark'; } catch (e) {}
+  if (saved === 'light') {
+    document.querySelectorAll('.theme-toggle-btn').forEach(function (btn) {
+      btn.innerHTML = '<i class="fa-solid fa-moon" aria-hidden="true"></i>';
+      btn.title = 'Cambiar a modo oscuro';
+      btn.setAttribute('aria-label', 'Cambiar a modo oscuro');
+    });
+  }
+})();
+
 /* ─── Sparkles — efecto de partículas neon en botones ─── */
 (function () {
   var colors = ['#00f5ff', '#ff2d78', '#a855f7', '#39ff14', '#ffe600'];

@@ -71,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <!-- ✅ Un solo CSS -->
   <link rel="stylesheet" href="style.css">
+  <script>(function(){try{if(localStorage.getItem('nv-theme')==='light')document.documentElement.classList.add('light-mode');}catch(e){}})()</script>
 </head>
 <body>
 
@@ -78,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <div class="auth-card">
 
     <div class="auth-card__logo">
-      <img src="./images/logo.png" alt="NovaPlay" onerror="this.style.display='none'">
+      <img src="./images/novaplay logo 2.png" alt="NovaPlay" onerror="this.style.display='none'">
     </div>
 
     <h2>Iniciar Sesión</h2>

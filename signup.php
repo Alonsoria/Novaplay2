@@ -54,6 +54,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Introduce un correo electrónico válido.';
         } elseif (strlen($password) < 8) {
             $error = 'La contraseña debe tener al menos 8 caracteres.';
+        } elseif (!preg_match('/[A-Z]/', $password)) {
+            $error = 'La contraseña debe contener al menos una letra mayúscula.';
+        } elseif (!preg_match('/[0-9]/', $password)) {
+            $error = 'La contraseña debe contener al menos un número.';
+        } elseif (!preg_match('/[^A-Za-z0-9]/', $password)) {
+            $error = 'La contraseña debe contener al menos un carácter especial (ej. !, @, #, $).';
         } elseif ($password !== $password2) {
             $error = 'Las contraseñas no coinciden.';
         } else {
@@ -123,6 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="style.css">
+  <script>(function(){try{if(localStorage.getItem('nv-theme')==='light')document.documentElement.classList.add('light-mode');}catch(e){}})()</script>
 </head>
 <body>
 
@@ -130,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <div class="auth-card" style="max-width:480px;">
 
     <div class="auth-card__logo">
-      <img src="./images/logo.png" alt="NovaPlay" onerror="this.style.display='none'">
+      <img src="./images/novaplay logo 2.png" alt="NovaPlay" onerror="this.style.display='none'">
     </div>
 
     <h2>Crear Cuenta</h2>
@@ -185,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  id="password"
                  name="password"
                  class="form-control"
-                 placeholder="Mínimo 8 caracteres"
+                 placeholder="Mín. 8 chars, mayúscula, número y símbolo"
                  required
                  autocomplete="new-password"
                  maxlength="128"
@@ -199,8 +206,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <!-- Medidor de fortaleza -->
         <div id="pwdStrength" style="height:4px;border-radius:2px;margin-top:6px;background:var(--clr-border);transition:background .3s;"></div>
         <small id="pwdStrengthLabel" class="text-muted" style="font-size:.75rem;"></small>
+        <!-- Checklist de requisitos -->
+        <ul id="pwdReqs" style="list-style:none;padding:0;margin:8px 0 0;font-size:.78rem;display:none;">
+          <li id="req-len"    style="margin:2px 0;color:var(--clr-text-muted);"><i class="fa-solid fa-circle-xmark" style="margin-right:5px;"></i>Mínimo 8 caracteres</li>
+          <li id="req-upper"  style="margin:2px 0;color:var(--clr-text-muted);"><i class="fa-solid fa-circle-xmark" style="margin-right:5px;"></i>Al menos una mayúscula</li>
+          <li id="req-num"    style="margin:2px 0;color:var(--clr-text-muted);"><i class="fa-solid fa-circle-xmark" style="margin-right:5px;"></i>Al menos un número</li>
+          <li id="req-special" style="margin:2px 0;color:var(--clr-text-muted);"><i class="fa-solid fa-circle-xmark" style="margin-right:5px;"></i>Al menos un carácter especial (!, @, #, $…)</li>
+        </ul>
       </div>
-
       <div class="form-group">
         <label for="password2">Confirmar contraseña</label>
         <input type="password"
@@ -245,22 +258,53 @@ document.getElementById('togglePwd').addEventListener('click', function () {
   icon.className = show ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
 });
 
-/* ─── Medidor de fortaleza ─── */
+/* ─── Medidor de fortaleza + checklist de requisitos ─── */
 document.getElementById('password').addEventListener('input', function () {
   const val   = this.value;
   const bar   = document.getElementById('pwdStrength');
   const label = document.getElementById('pwdStrengthLabel');
-  let score   = 0;
-  if (val.length >= 8)              score++;
-  if (/[A-Z]/.test(val))            score++;
-  if (/[0-9]/.test(val))            score++;
-  if (/[^A-Za-z0-9]/.test(val))     score++;
+  const reqs  = document.getElementById('pwdReqs');
 
-  const colors = ['#ef4444','#f59e0b','#22c55e','#22c55e'];
-  const labels = ['Muy débil','Débil','Segura','Muy segura'];
+  const checks = {
+    len:     val.length >= 8,
+    upper:   /[A-Z]/.test(val),
+    num:     /[0-9]/.test(val),
+    special: /[^A-Za-z0-9]/.test(val),
+  };
+
+  /* Mostrar checklist solo cuando el usuario empieza a escribir */
+  reqs.style.display = val.length ? 'block' : 'none';
+
+  /* Actualizar cada ítem del checklist */
+  Object.entries(checks).forEach(([key, ok]) => {
+    const li   = document.getElementById('req-' + key);
+    const icon = li.querySelector('i');
+    li.style.color      = ok ? '#22c55e' : 'var(--clr-text-muted)';
+    icon.className      = ok ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-xmark';
+    icon.style.marginRight = '5px';
+  });
+
+  const score = Object.values(checks).filter(Boolean).length;
+  const colors = ['#ef4444','#f59e0b','#eab308','#22c55e'];
+  const labels = ['Muy débil','Débil','Casi segura','Muy segura'];
   bar.style.width      = (score * 25) + '%';
   bar.style.background = colors[score - 1] || 'var(--clr-border)';
   label.textContent    = val.length ? labels[score - 1] || '' : '';
+});
+
+/* ─── Bloquear envío si la contraseña no cumple los requisitos ─── */
+document.getElementById('signupForm').addEventListener('submit', function (e) {
+  const val = document.getElementById('password').value;
+  if (
+    val.length < 8 ||
+    !/[A-Z]/.test(val) ||
+    !/[0-9]/.test(val) ||
+    !/[^A-Za-z0-9]/.test(val)
+  ) {
+    e.preventDefault();
+    document.getElementById('pwdReqs').style.display = 'block';
+    document.getElementById('password').focus();
+  }
 });
 
 /* ─── Validación nombre de usuario ─── */
