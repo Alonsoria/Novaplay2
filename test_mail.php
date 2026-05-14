@@ -1,7 +1,7 @@
 <?php
 /**
  * NOVAPLAY — TEST_MAIL.PHP
- * Diagnóstico y prueba de envío de correo SMTP.
+ * Diagnóstico y prueba de envío de correo SMTP (Brevo).
  * SOLO para desarrollo local. Eliminar o proteger en producción.
  */
 
@@ -13,14 +13,13 @@ $testTo    = trim($_POST['test_to'] ?? '');
 $resultado = null;
 $errorMsg  = '';
 
-$esMailtrap    = str_contains(MAIL_HOST, 'mailtrap');
-$destinoValido = strlen($testTo) > 0;
+$esBrevo = str_contains(MAIL_HOST, 'brevo');
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $destinoValido) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && strlen($testTo) > 0) {
     $ok = nova_send_mail(
         $testTo,
         '[TEST] Prueba de correo - Novaplay',
-        "Este es un correo de prueba enviado desde Novaplay.\n\nSi ves esto en Mailtrap, el SMTP funciona correctamente."
+        "Este es un correo de prueba enviado desde Novaplay.\n\nSi ves esto en tu bandeja, el SMTP de Brevo funciona correctamente."
     );
     $resultado = $ok ? 'OK' : 'ERROR';
     if (!$ok) {
@@ -34,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $destinoValido) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Test de Correo | NovaPlay</title>
+  <link rel="icon" href="./images/novaplay icono.png" type="image/png">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="style.css">
@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $destinoValido) {
     </h3>
     <div class="diag-box">
       <div class="diag-row"><span>MAIL_HOST</span>
-        <strong class="badge-ok"><?= e(MAIL_HOST) ?> <?= $esMailtrap ? '✓ Mailtrap' : '' ?></strong>
+        <strong class="badge-ok"><?= e(MAIL_HOST) ?> <?= $esBrevo ? '✓ Brevo' : '' ?></strong>
       </div>
       <div class="diag-row"><span>MAIL_PORT</span><strong><?= e((string)MAIL_PORT) ?></strong></div>
       <div class="diag-row"><span>MAIL_USER</span><strong class="badge-ok"><?= e(MAIL_USER) ?> ✓</strong></div>
@@ -74,15 +74,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $destinoValido) {
       <div class="diag-row"><span>Cifrado</span><strong><?= MAIL_PORT == 465 ? 'SMTPS (SSL/465)' : 'STARTTLS (587)' ?></strong></div>
     </div>
 
-    <?php if ($esMailtrap): ?>
+    <?php if ($esBrevo): ?>
     <div class="diag-box" style="border-color:#6366f155;">
       <p style="color:#818cf8;font-weight:700;margin-bottom:6px;">
-        <i class="fa-solid fa-circle-info"></i> Modo Mailtrap (sandbox)
+        <i class="fa-solid fa-circle-info"></i> Modo Brevo (SMTP real)
       </p>
       <p style="color:var(--clr-text-muted);font-size:.87rem;margin:0;">
-        Todos los correos van a tu bandeja en
-        <strong style="color:var(--clr-white);">mailtrap.io → Email Testing → tu inbox</strong>.
-        El campo "destino" puede ser cualquier dirección — Mailtrap los intercepta todos.
+        El correo se enviará a la dirección real que indiques. Verifica tu bandeja de entrada
+        (y carpeta de spam si no aparece).
+        Revisa las estadísticas en <strong style="color:var(--clr-white);">app.brevo.com → Transactional → Logs</strong>.
       </p>
     </div>
     <?php endif; ?>
@@ -96,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $destinoValido) {
       <div class="alert" style="background:rgba(34,197,94,.12);border:1px solid #22c55e;color:#22c55e;border-radius:8px;padding:12px 16px;margin-bottom:12px;">
         <i class="fa-solid fa-circle-check"></i>
         <strong>¡Correo enviado!</strong>
-        Revisa tu bandeja en <strong>mailtrap.io → Email Testing → tu inbox</strong>.
+        Revisa tu bandeja de entrada. Si no llega, verifica en <strong>app.brevo.com → Transactional → Logs</strong>.
       </div>
     <?php elseif ($resultado === 'ERROR'): ?>
       <div class="alert alert--error" style="margin-bottom:8px;">
@@ -107,18 +107,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $destinoValido) {
 
     <form method="POST" action="test_mail.php" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
       <div class="form-group" style="flex:1;min-width:220px;margin:0;">
-        <label for="test_to" style="font-size:.85rem;">
-          Correo destino
-          <?php if ($esMailtrap): ?>
-            <small style="color:#818cf8;">(cualquier dirección funciona)</small>
-          <?php endif; ?>
-        </label>
-        <input type="<?= $esMailtrap ? 'text' : 'email' ?>"
+        <label for="test_to" style="font-size:.85rem;">Correo destino</label>
+        <input type="email"
                id="test_to"
                name="test_to"
                class="form-control"
-               placeholder="<?= $esMailtrap ? 'test@novaplay.com' : 'destino@ejemplo.com' ?>"
-               value="<?= isset($_POST['test_to']) ? e($_POST['test_to']) : ($esMailtrap ? 'test@novaplay.com' : '') ?>"
+               placeholder="destino@ejemplo.com"
+               value="<?= isset($_POST['test_to']) ? e($_POST['test_to']) : '' ?>"
                required>
       </div>
       <button type="submit" class="btn" style="white-space:nowrap;">

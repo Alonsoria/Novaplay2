@@ -3856,3 +3856,12 @@ html.light-mode .btn2 {
 html.light-mode .about-hero h1,
 html.light-mode .about-feat-title { color: #000000 !important; }
 html.light-mode .suc-prod-title   { color: #000000 !important; }
+
+/* ── Precio en tarjetas de producto (modo claro vs oscuro) ── */
+.dev-prod-precio { color: #fff; }
+html.light-mode .dev-prod-precio { color: #000; }
+
+/* ── Shadow del precio de productos (.card strong) en modo claro ── */
+html.light-mode .card strong {
+  text-shadow: 0 0 8px rgba(138,0,52,.5);
+}

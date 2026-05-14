@@ -131,11 +131,13 @@ if (!empty($pedidos)) {
     $types        = str_repeat('i', count($idsPedidos));
     $stmtCod      = $conn->prepare(
         "SELECT ca.id AS codigo_id, ca.id_pedido, ca.nombre_producto, ca.imagen_producto, ca.codigo,
+                COALESCE(p.precio, 0) AS precio,
                 COALESCE(GROUP_CONCAT(DISTINCT pp.id_plataforma ORDER BY pp.id_plataforma SEPARATOR ','), '') AS plataformas
          FROM codigos_activacion ca
+         LEFT JOIN productos p ON ca.id_producto = p.id_producto
          LEFT JOIN producto_plataforma pp ON ca.id_producto = pp.id_producto
          WHERE ca.id_pedido IN ($placeholders) AND ca.devuelto = 0
-         GROUP BY ca.id, ca.id_pedido, ca.nombre_producto, ca.imagen_producto, ca.codigo
+         GROUP BY ca.id, ca.id_pedido, ca.nombre_producto, ca.imagen_producto, ca.codigo, p.precio
          ORDER BY ca.id"
     );
     $stmtCod->bind_param($types, ...$idsPedidos);
@@ -151,6 +153,7 @@ if (!empty($pedidos)) {
             'nombre_producto' => $row['nombre_producto'],
             'imagen_producto' => $row['imagen_producto'],
             'plataformas'     => $plats,
+            'precio'          => (float)$row['precio'],
         ];
         if ($confirmadoMap[$pid] ?? 0) {
             $codigosConfirmados[$pid][] = [
@@ -653,6 +656,7 @@ try {
     var imagen    = item.imagen_producto;
     var plats     = item.plataformas || [];
     var codigoId  = item.codigo_id;
+    var precio    = item.precio != null ? parseFloat(item.precio) : null;
 
     var labelStyle = 'display:flex;align-items:flex-start;gap:12px;cursor:pointer;' +
                      'background:rgba(0,0,0,.7);padding:12px 14px;border-radius:10px;' +
@@ -689,7 +693,15 @@ try {
       });
       h += '</div>';
     }
-    h += '</div></label>';
+    h += '</div>';
+
+    /* Precio al extremo derecho */
+    if (precio !== null && !isNaN(precio)) {
+      h += '<div class="dev-prod-precio" style="flex-shrink:0;align-self:center;font-weight:700;font-size:.9rem;">' +
+           '$' + precio.toFixed(2) + '</div>';
+    }
+
+    h += '</label>';
     return h;
   }
 

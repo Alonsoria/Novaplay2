@@ -89,6 +89,7 @@ if (is_logged_in()) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="NovaPlay — Tu tienda de videojuegos y suscripciones gaming">
   <title><?= $pageTitle ?> | NovaPlay</title>
+  <link rel="icon" href="./images/novaplay icono.png" type="image/png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
