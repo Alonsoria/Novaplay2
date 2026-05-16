@@ -101,6 +101,14 @@ if (is_logged_in()) {
   <!-- AOS — Animate On Scroll -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
   <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+  <!-- Formateador de moneda MXN — disponible globalmente en todas las páginas -->
+  <script>
+    function fmtMXN(n) {
+      return '$' + new Intl.NumberFormat('es-MX', {
+        minimumFractionDigits: 2, maximumFractionDigits: 2
+      }).format(n);
+    }
+  </script>
   <!-- Aplicar tema guardado antes de renderizar (evita parpadeo) -->
   <script>
     (function(){
@@ -364,17 +372,10 @@ if (is_logged_in()) {
   <!-- ── Separador ── -->
   <div class="sidebar-divider"></div>
 
-  <!-- ── Icono de notificaciones ── -->
-  <button class="sidebar-icon sidebar-notif-btn" id="notifBtn"
-          title="Notificaciones" data-tooltip="Notificaciones" aria-label="Ver notificaciones"
-          aria-expanded="false" aria-controls="notifPanel">
-    <i class="fa-solid fa-bell"></i>
-    <?php if (!empty($notifCount) && $notifCount > 0): ?>
-      <span class="cart-count-badge notif-badge" id="notifBadge"><?= $notifCount ?></span>
-    <?php else: ?>
-      <span class="cart-count-badge d-none" id="notifBadge">0</span>
-    <?php endif; ?>
-  </button>
+  <!-- ── Enlace a pedidos del perfil ── -->
+  <a href="perfil.php#pedidos" class="sidebar-icon" title="Mis Pedidos" data-tooltip="Mis Pedidos" aria-label="Mis Pedidos">
+    <i class="fa-solid fa-box"></i>
+  </a>
 
   <!-- ── Panel de notificaciones ── -->
   <div class="notif-panel" id="notifPanel" role="dialog" aria-label="Notificaciones" aria-hidden="true">

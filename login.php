@@ -135,6 +135,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </button>
     </form>
 
+    <div class="auth-card__footer" style="margin-top:20px;">
+      <a href="recuperar_cuenta.php" style="color:var(--clr-accent);font-size:.85rem;">
+        <i class="fa-solid fa-key" aria-hidden="true"></i>
+        ¿Olvidaste tu contraseña?
+      </a>
+    </div>
+
     <div class="auth-card__footer">
       ¿No tienes cuenta?
       <a href="signup.php">Regístrate gratis</a>

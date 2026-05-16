@@ -1,9 +1,14 @@
 <?php
 /**
- * NOVAPLAY — CONFIRMAR_PEDIDO.PHP
- * Endpoint AJAX: marca el pedido como confirmado (confirmado=1),
- * devuelve los códigos de activación con plataforma y envía correo con los códigos.
- * Solo acepta POST. Requiere sesión activa.
+ * NOVAPLAY — CONFIRMAR_PEDIDO.PHP  v2
+ * Confirmación granular por ítem.
+ *
+ * POST: pedido_id  — obligatorio
+ *       codigo_ids — JSON array de IDs de codigos_activacion (opcional).
+ *                    Si se omite, confirma TODOS los ítems pendientes del pedido.
+ *
+ * Responde JSON:
+ *   { success, productos[], cashback, puntos, all_done, remaining }
  */
 
 require_once 'security.php';
@@ -26,6 +31,7 @@ if (!is_logged_in()) {
 
 $uid      = (int)$_SESSION['user_id'];
 $pedidoId = clean_int($_POST['pedido_id'] ?? null);
+$rawIds   = $_POST['codigo_ids'] ?? '';
 
 if (!$pedidoId) {
     http_response_code(400);
@@ -33,10 +39,10 @@ if (!$pedidoId) {
     exit;
 }
 
-/* Verificar que el pedido pertenece al usuario, está pagado y no confirmado */
+/* Verificar que el pedido pertenece al usuario y está pagado */
 $stmt = $conn->prepare(
     "SELECT id_pedido FROM pedidos
-     WHERE id_pedido = ? AND id_usuario = ? AND estado = 'pagado' AND confirmado = 0"
+     WHERE id_pedido = ? AND id_usuario = ? AND estado = 'pagado'"
 );
 $stmt->bind_param("ii", $pedidoId, $uid);
 $stmt->execute();
@@ -45,67 +51,141 @@ $stmt->close();
 
 if (!$pedido) {
     http_response_code(404);
-    echo json_encode(['error' => 'Pedido no elegible para confirmación']);
+    echo json_encode(['error' => 'Pedido no encontrado o no elegible para confirmación']);
     exit;
 }
 
-/* Marcar como confirmado */
-$stmtUpd = $conn->prepare("UPDATE pedidos SET confirmado = 1 WHERE id_pedido = ?");
-$stmtUpd->bind_param("i", $pedidoId);
+/* ── Resolver qué IDs confirmar ── */
+$codigoIds = [];
+if ($rawIds) {
+    $decoded = json_decode($rawIds, true);
+    if (is_array($decoded)) {
+        $codigoIds = array_values(
+            array_filter(array_map('intval', $decoded), fn($id) => $id > 0)
+        );
+    }
+}
+
+if (empty($codigoIds)) {
+    /* Sin selección → confirmar TODOS los ítems pendientes */
+    $stmtAll = $conn->prepare(
+        "SELECT id FROM codigos_activacion
+         WHERE id_pedido = ? AND devuelto = 0 AND confirmado = 0"
+    );
+    $stmtAll->bind_param("i", $pedidoId);
+    $stmtAll->execute();
+    $resAll = $stmtAll->get_result();
+    while ($row = $resAll->fetch_assoc()) $codigoIds[] = (int)$row['id'];
+    $stmtAll->close();
+}
+
+if (empty($codigoIds)) {
+    echo json_encode(['error' => 'No hay productos pendientes de confirmar en este pedido']);
+    exit;
+}
+
+/* ── Validar que los IDs pertenecen al pedido y son elegibles ── */
+$ph      = implode(',', array_fill(0, count($codigoIds), '?'));
+$typesV  = 'i' . str_repeat('i', count($codigoIds));
+$paramsV = array_merge([$pedidoId], $codigoIds);
+
+$stmtV = $conn->prepare(
+    "SELECT ca.id, COALESCE(p.precio, 0) AS precio
+     FROM codigos_activacion ca
+     LEFT JOIN productos p ON ca.id_producto = p.id_producto
+     WHERE ca.id_pedido = ? AND ca.id IN ($ph)
+       AND ca.devuelto = 0 AND ca.confirmado = 0"
+);
+$stmtV->bind_param($typesV, ...$paramsV);
+$stmtV->execute();
+$resV      = $stmtV->get_result();
+$validIds  = [];
+$sumPrecios = 0.0;
+while ($row = $resV->fetch_assoc()) {
+    $validIds[]  = (int)$row['id'];
+    $sumPrecios += (float)$row['precio'];
+}
+$stmtV->close();
+
+if (empty($validIds)) {
+    echo json_encode(['error' => 'Ningún producto seleccionado es elegible para confirmación']);
+    exit;
+}
+
+/* ── Marcar como confirmados ── */
+$ph2     = implode(',', array_fill(0, count($validIds), '?'));
+$typesU  = str_repeat('i', count($validIds));
+$stmtUpd = $conn->prepare("UPDATE codigos_activacion SET confirmado = 1 WHERE id IN ($ph2)");
+$stmtUpd->bind_param($typesU, ...$validIds);
 $stmtUpd->execute();
 $stmtUpd->close();
 
-/* ── Acreditar cashback (10%) — se otorga aquí, al confirmar, no al pagar ── */
-$stmtTotal = $conn->prepare("SELECT total FROM pedidos WHERE id_pedido = ?");
-$stmtTotal->bind_param("i", $pedidoId);
-$stmtTotal->execute();
-$pedidoTotal = (float)($stmtTotal->get_result()->fetch_assoc()['total'] ?? 0);
-$stmtTotal->close();
+/* ── ¿Quedan ítems pendientes? ── */
+$stmtChk = $conn->prepare(
+    "SELECT COUNT(*) AS c FROM codigos_activacion
+     WHERE id_pedido = ? AND devuelto = 0 AND confirmado = 0"
+);
+$stmtChk->bind_param("i", $pedidoId);
+$stmtChk->execute();
+$remaining = (int)($stmtChk->get_result()->fetch_assoc()['c'] ?? 0);
+$stmtChk->close();
 
-$cashback   = (int)floor($pedidoTotal * 0.10);
+/* Cerrar pedido si ya no hay pendientes */
+if ($remaining === 0) {
+    $stmtPed = $conn->prepare("UPDATE pedidos SET confirmado = 1 WHERE id_pedido = ?");
+    $stmtPed->bind_param("i", $pedidoId);
+    $stmtPed->execute();
+    $stmtPed->close();
+}
+
+/* ── Cashback sobre los ítems confirmados en esta llamada ── */
+$cashback   = (int)floor($sumPrecios * 0.10);
 $mesCurrent = date('Y-m');
 
-$stmtMesU = $conn->prepare("SELECT puntos_reset_mes FROM usuarios WHERE id_usuario = ?");
-$stmtMesU->bind_param("i", $uid);
-$stmtMesU->execute();
-$mesBD = $stmtMesU->get_result()->fetch_assoc()['puntos_reset_mes'] ?? '';
-$stmtMesU->close();
+if ($cashback > 0) {
+    $stmtMes = $conn->prepare("SELECT puntos_reset_mes FROM usuarios WHERE id_usuario = ?");
+    $stmtMes->bind_param("i", $uid);
+    $stmtMes->execute();
+    $mesBD = $stmtMes->get_result()->fetch_assoc()['puntos_reset_mes'] ?? '';
+    $stmtMes->close();
 
-if ($mesBD !== $mesCurrent) {
-    $stmtPts = $conn->prepare(
-        "UPDATE usuarios SET puntos = ?, puntos_reset_mes = ? WHERE id_usuario = ?"
-    );
-    $stmtPts->bind_param("isi", $cashback, $mesCurrent, $uid);
-} else {
-    $stmtPts = $conn->prepare("UPDATE usuarios SET puntos = puntos + ? WHERE id_usuario = ?");
-    $stmtPts->bind_param("ii", $cashback, $uid);
+    if ($mesBD !== $mesCurrent) {
+        $stmtPts = $conn->prepare(
+            "UPDATE usuarios SET puntos = ?, puntos_reset_mes = ? WHERE id_usuario = ?"
+        );
+        $stmtPts->bind_param("isi", $cashback, $mesCurrent, $uid);
+    } else {
+        $stmtPts = $conn->prepare("UPDATE usuarios SET puntos = puntos + ? WHERE id_usuario = ?");
+        $stmtPts->bind_param("ii", $cashback, $uid);
+    }
+    $stmtPts->execute();
+    $stmtPts->close();
 }
-$stmtPts->execute();
-$stmtPts->close();
 
-/* Leer puntos actualizados para devolver al cliente */
 $stmtNP = $conn->prepare("SELECT puntos FROM usuarios WHERE id_usuario = ?");
 $stmtNP->bind_param("i", $uid);
 $stmtNP->execute();
 $nuevosPuntos = (int)($stmtNP->get_result()->fetch_assoc()['puntos'] ?? 0);
 $stmtNP->close();
 
-/* Obtener códigos con plataformas desde producto_plataforma */
+/* ── Obtener códigos de los ítems recién confirmados ── */
+$phC     = implode(',', array_fill(0, count($validIds), '?'));
+$typesC  = str_repeat('i', count($validIds));
 $stmtCod = $conn->prepare(
     "SELECT ca.nombre_producto, ca.imagen_producto, ca.codigo,
             COALESCE(GROUP_CONCAT(DISTINCT pp.id_plataforma ORDER BY pp.id_plataforma SEPARATOR ','), '') AS plataformas
      FROM codigos_activacion ca
      LEFT JOIN producto_plataforma pp ON ca.id_producto = pp.id_producto
-     WHERE ca.id_pedido = ?
+     WHERE ca.id IN ($phC)
      GROUP BY ca.id, ca.nombre_producto, ca.imagen_producto, ca.codigo
      ORDER BY ca.id"
 );
-$stmtCod->bind_param("i", $pedidoId);
+$stmtCod->bind_param($typesC, ...$validIds);
 $stmtCod->execute();
-$res       = $stmtCod->get_result();
+$res      = $stmtCod->get_result();
 $productos = [];
 while ($row = $res->fetch_assoc()) {
-    $plats      = $row['plataformas'] !== ''
+    $plats     = $row['plataformas'] !== ''
         ? array_map('intval', explode(',', $row['plataformas']))
         : [];
     $productos[] = [
@@ -117,7 +197,7 @@ while ($row = $res->fetch_assoc()) {
 }
 $stmtCod->close();
 
-/* Enviar correo con los códigos */
+/* ── Correo con los códigos confirmados ── */
 $stmtU = $conn->prepare("SELECT nombre, email FROM usuarios WHERE id_usuario = ?");
 $stmtU->bind_param("i", $uid);
 $stmtU->execute();
@@ -137,19 +217,20 @@ foreach ($productos as $p) {
 }
 
 $emailBody = "Hola {$userData['nombre']},\n\n"
-    . "¡Has confirmado tus productos del pedido #{$pedidoId}!\n"
-    . "Aquí están tus códigos de activación:\n\n"
+    . "¡Confirmaste " . count($productos) . " producto(s) del pedido #{$pedidoId}!\n\n"
     . "────────────────────────────────────\n"
     . $listaEmail
     . "────────────────────────────────────\n\n"
+    . ($remaining > 0
+        ? "Tienes {$remaining} producto(s) pendientes de confirmar en este pedido.\n\n"
+        : '')
     . "Guárdalos en un lugar seguro.\n"
-    . "También los encontrarás en el historial de tu perfil.\n\n"
     . "— Equipo Novaplay";
 
 try {
     nova_send_mail(
         $userData['email'],
-        "Tus códigos de activación — Pedido #{$pedidoId}",
+        "Tus códigos — Pedido #{$pedidoId}",
         $emailBody
     );
 } catch (Exception $e) {
@@ -161,4 +242,6 @@ echo json_encode([
     'productos' => $productos,
     'cashback'  => $cashback,
     'puntos'    => $nuevosPuntos,
+    'all_done'  => ($remaining === 0),
+    'remaining' => $remaining,
 ]);

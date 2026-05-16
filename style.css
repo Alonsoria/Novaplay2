@@ -3865,3 +3865,13 @@ html.light-mode .dev-prod-precio { color: #000; }
 html.light-mode .card strong {
   text-shadow: 0 0 8px rgba(138,0,52,.5);
 }
+
+/* ── Cart summary box: reemplaza el negro del gradiente en modo claro ── */
+html.light-mode .cart-summary-box {
+  background: linear-gradient(160deg, var(--clr-surface) 0%, rgb(255 213 254 / 90%) 100%);
+}
+
+/* ── Reward points box: reemplaza el negro del gradiente en modo claro ── */
+html.light-mode .reward-points-box {
+  background: linear-gradient(135deg, var(--clr-surface) 0%, rgb(255 213 254 / 90%) 100%);
+}
