@@ -90,7 +90,7 @@ $cashback = (int)floor($total * 0.10);
 
 /* ── Notificación interna ── */
 try {
-    $msg   = "¡Pago OXXO confirmado! Pedido #{$pedidoId}. Confirma tus productos para ganar {$cashback} puntos.";
+    $msg   = "¡Pago en tienda confirmado! Pedido #{$pedidoId}. Confirma tus productos para ganar {$cashback} puntos.";
     $stmtN = $conn->prepare("INSERT INTO notificaciones (id_usuario, mensaje) VALUES (?, ?)");
     $stmtN->bind_param("is", $uid, $msg);
     $stmtN->execute();
@@ -107,7 +107,7 @@ try {
 
     if (!empty($userMail['email'])) {
         $mailBody  = "Hola {$userMail['nombre']},\n\n";
-        $mailBody .= "¡Tu pago OXXO del pedido #{$pedidoId} ha sido confirmado!\n\n";
+        $mailBody .= "¡Tu pago en tienda del pedido #{$pedidoId} ha sido confirmado!\n\n";
         $mailBody .= "Tus códigos se han generado. ¡Disfrútalos!\n\n";
         foreach ($codigosCompra as $item) {
             $mailBody .= $item['nombre'] . ': ' . $item['codigo'] . "\n";
@@ -116,7 +116,7 @@ try {
 
         nova_send_mail(
             $userMail['email'],
-            "¡Pago OXXO confirmado! — Pedido #{$pedidoId}",
+            "¡Pago en tienda confirmado! — Pedido #{$pedidoId}",
             $mailBody
         );
     }
@@ -129,6 +129,7 @@ unset(
     $_SESSION['oxxo_pedido_id'],
     $_SESSION['oxxo_referencia'],
     $_SESSION['oxxo_barcode_url'],
+    $_SESSION['oxxo_redirect_url'],
     $_SESSION['oxxo_expira'],
     $_SESSION['oxxo_total']
 );

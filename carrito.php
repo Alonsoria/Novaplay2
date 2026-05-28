@@ -296,7 +296,7 @@ if (!empty($_SESSION['pago_error'])) {
             <?= csrf_field() ?>
             <button type="button" id="btn-oxxo"
                     style="width:100%;background:linear-gradient(135deg,#0d9488,#0891b2);
-                           border:none;border-radius:var(--radius-sm);padding:11px;color:#fff;
+                           border:none;border-radius:var(--radius-full);padding:11px;color:#fff;
                            font-size:.9rem;font-weight:600;cursor:pointer;
                            display:flex;align-items:center;justify-content:center;gap:8px;
                            box-shadow:0 3px 14px rgba(13,148,136,.35);">

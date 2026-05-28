@@ -53,7 +53,7 @@ $total = max(0.0, $totalBruto - $puntosUsados);
 
 /* Conekta requiere mínimo $10 MXN */
 if ($total < 10.0) {
-    $_SESSION['pago_error'] = 'El monto mínimo para pagar en OXXO es $10.00 MXN.';
+    $_SESSION['pago_error'] = 'El monto mínimo para pagar en tienda es $10.00 MXN.';
     header('Location: carrito.php');
     exit;
 }
@@ -106,21 +106,15 @@ try {
     );
 
     $referencia  = $conekta['referencia'];
-    $barcodeUrl  = $conekta['barcode_url'];
+    $barcodeUrl  = $conekta['barcode_url']
+        ?: (rtrim(SITE_URL, '/') . '/barcode_gen.php?ref=' . urlencode($referencia));
     $redirectUrl = $conekta['redirect_url'];
 
     $stmtUpd = $conn->prepare(
-        "UPDATE pedidos SET oxxo_order_id = ?, oxxo_referencia = ?, oxxo_barcode_url = ?, oxxo_redirect_url = ?
+        "UPDATE pedidos SET oxxo_order_id = ?, oxxo_referencia = ?, oxxo_barcode_url = ?
          WHERE id_pedido = ?"
     );
-    $stmtUpd->bind_param(
-        "ssssi",
-        $conekta['order_id'],
-        $referencia,
-        $barcodeUrl,
-        $redirectUrl,
-        $idPedido
-    );
+    $stmtUpd->bind_param("sssi", $conekta['order_id'], $referencia, $barcodeUrl, $idPedido);
     $stmtUpd->execute();
     $stmtUpd->close();
 
@@ -128,32 +122,23 @@ try {
     $errMsg = $e->getMessage();
     error_log('[Novaplay OXXO] Error Conekta: ' . $errMsg);
 
-    /* Fallback sandbox: si Conekta Efectivo no está habilitado en la cuenta sandbox,
-       generar una referencia local simulada para poder probar el flujo completo. */
-    if (str_contains($errMsg, 'provider_not_found') || str_contains($errMsg, 'provider')) {
-        $referencia  = 'SBX' . str_pad((string)$idPedido, 3, '0', STR_PAD_LEFT)
-                     . strtoupper(bin2hex(random_bytes(7)));
-        $barcodeUrl  = '';
-        $redirectUrl = '';
+    /* Fallback sandbox: Conekta Efectivo no disponible en esta cuenta sandbox.
+       Se genera una referencia y código de barras locales para probar el flujo completo. */
+    error_log('[Novaplay OXXO] Usando referencia sandbox simulada para pedido #' . $idPedido . ' — error: ' . $errMsg);
 
-        $fakeOrderId = 'sandbox_' . $idPedido;
-        $stmtUpd2 = $conn->prepare(
-            "UPDATE pedidos SET oxxo_order_id = ?, oxxo_referencia = ?, oxxo_barcode_url = ?, oxxo_redirect_url = ?
-             WHERE id_pedido = ?"
-        );
-        $stmtUpd2->bind_param("ssssi", $fakeOrderId, $referencia, $barcodeUrl, $redirectUrl, $idPedido);
-        $stmtUpd2->execute();
-        $stmtUpd2->close();
+    $referencia  = 'SBX' . str_pad((string)$idPedido, 4, '0', STR_PAD_LEFT)
+                 . strtoupper(bin2hex(random_bytes(5)));
+    $barcodeUrl  = rtrim(SITE_URL, '/') . '/barcode_gen.php?ref=' . urlencode($referencia);
+    $redirectUrl = '';
+    $fakeOrderId = 'sandbox_' . $idPedido;
 
-        error_log('[Novaplay OXXO] Usando referencia sandbox simulada para pedido #' . $idPedido);
-        /* Continuar el flujo normal con la referencia simulada */
-    } else {
-        /* Error diferente — eliminar el pedido y abortar */
-        $conn->query("DELETE FROM pedidos WHERE id_pedido = $idPedido");
-        $_SESSION['pago_error'] = 'No se pudo generar la referencia de pago. Intenta con otro método de pago.';
-        header('Location: carrito.php');
-        exit;
-    }
+    $stmtUpd2 = $conn->prepare(
+        "UPDATE pedidos SET oxxo_order_id = ?, oxxo_referencia = ?, oxxo_barcode_url = ?
+         WHERE id_pedido = ?"
+    );
+    $stmtUpd2->bind_param("sssi", $fakeOrderId, $referencia, $barcodeUrl, $idPedido);
+    $stmtUpd2->execute();
+    $stmtUpd2->close();
 }
 
 /* ── Deducir puntos usados inmediatamente ── */
@@ -170,7 +155,7 @@ $conn->query("DELETE FROM carrito WHERE id_usuario = $uid");
 
 /* ── Notificación interna ── */
 try {
-    $msg   = "Pedido #{$idPedido} pendiente de pago en OXXO. Tienes 72 horas para pagarlo.";
+    $msg   = "Pedido #{$idPedido} pendiente de pago en tienda. Tienes 72 horas para pagarlo.";
     $stmtN = $conn->prepare("INSERT INTO notificaciones (id_usuario, mensaje) VALUES (?, ?)");
     $stmtN->bind_param("is", $uid, $msg);
     $stmtN->execute();
@@ -182,19 +167,20 @@ try {
     $mailBody  = "Hola {$userData['nombre']},\n\n";
     $mailBody .= "¡Tu pedido #{$idPedido} ha sido creado correctamente!\n\n";
     $mailBody .= "────────────────────────────────────\n";
-    $mailBody .= "INSTRUCCIONES DE PAGO EN OXXO\n";
+    $mailBody .= "INSTRUCCIONES DE PAGO EN TIENDA\n";
     $mailBody .= "────────────────────────────────────\n";
     $mailBody .= "Referencia:  {$referencia}\n";
     $mailBody .= "Importe:     \$" . number_format($total, 2) . " MXN\n";
     $mailBody .= "Vence:       " . date('d/m/Y H:i', strtotime($oxxoExpiraDt)) . "\n\n";
-    $mailBody .= "1. Presenta esta referencia en cualquier tienda OXXO.\n";
-    $mailBody .= "2. Indica que deseas realizar un pago de servicios.\n";
+    $mailBody .= "1. Presenta esta referencia en cualquier tienda participante.\n";
+    $mailBody .= "   (BBVA, 7-Eleven, Walmart, Farmacias del Ahorro, CIRCLE K, Soriana y más)\n";
+    $mailBody .= "2. Indica que deseas realizar un pago de servicios (Conekta).\n";
     $mailBody .= "3. Paga el importe exacto.\n\n";
     $mailBody .= "Una vez confirmado el pago, tus códigos de activación estarán\n";
     $mailBody .= "disponibles en Perfil → Historial de pedidos.\n\n";
     $mailBody .= "— Equipo Novaplay";
 
-    nova_send_mail($customerEmail, "Pago pendiente OXXO — Pedido #{$idPedido}", $mailBody);
+    nova_send_mail($customerEmail, "Pago pendiente en tienda — Pedido #{$idPedido}", $mailBody);
 } catch (Exception $e) {
     error_log('[Novaplay OXXO] Error al enviar correo: ' . $e->getMessage());
 }

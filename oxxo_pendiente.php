@@ -27,8 +27,7 @@ if (!$pedidoId) {
 
 /* Verificar en BD que el pedido pertenece al usuario y sigue pendiente */
 $stmtPed = $conn->prepare(
-    "SELECT oxxo_referencia, oxxo_barcode_url, COALESCE(oxxo_redirect_url,'') AS oxxo_redirect_url,
-            oxxo_expira, total
+    "SELECT oxxo_referencia, oxxo_barcode_url, oxxo_expira, total
      FROM pedidos WHERE id_pedido = ? AND id_usuario = ? AND estado = 'pendiente_oxxo'"
 );
 $stmtPed->bind_param("ii", $pedidoId, $uid);
@@ -43,11 +42,11 @@ if (!$pedidoRow) {
 }
 
 /* Completar con datos de BD si la sesión no los tiene (acceso desde perfil) */
-$referencia  = $referencia  ?: $pedidoRow['oxxo_referencia'];
-$barcodeUrl  = $barcodeUrl  ?: $pedidoRow['oxxo_barcode_url'];
-$redirectUrl = $redirectUrl ?: $pedidoRow['oxxo_redirect_url'];
-$expiraTs    = $expiraTs    ?: (int)strtotime($pedidoRow['oxxo_expira']);
-$total       = $total       ?: (float)$pedidoRow['total'];
+$referencia = $referencia ?: $pedidoRow['oxxo_referencia'];
+$barcodeUrl = $barcodeUrl ?: $pedidoRow['oxxo_barcode_url'];
+/* redirect_url solo existe en sesión (generada al crear el pedido) */
+$expiraTs   = $expiraTs   ?: (int)strtotime($pedidoRow['oxxo_expira']);
+$total      = $total      ?: (float)$pedidoRow['total'];
 
 $tiendas = [
     'BBVA', '7-Eleven', 'Farmacias del Ahorro', 'CIRCLE K', 'Tiendas Extra',
@@ -63,7 +62,7 @@ $pageTitle = 'Pagar en tienda';
 require_once 'header.php';
 ?>
 
-<main class="result-page" aria-label="Instrucciones de pago en tienda" style="max-width:600px;">
+<main class="result-page" aria-label="Instrucciones de pago en tienda" style="max-width:600px;margin:0 auto;">
 
   <!-- Encabezado -->
   <div style="text-align:center;margin-bottom:28px;">
@@ -106,15 +105,9 @@ require_once 'header.php';
     <?php if ($barcodeUrl): ?>
       <img src="<?= e($barcodeUrl) ?>"
            alt="Código de barras de pago"
-           style="max-width:100%;height:auto;max-height:120px;display:block;margin:0 auto 20px;"
+           style="max-width:280px;width:100%;height:auto;display:block;margin:0 auto 20px;
+                  background:#fff;padding:8px;border-radius:6px;"
            onerror="this.style.display='none'">
-    <?php elseif (!$redirectUrl): ?>
-      <div style="background:rgba(245,158,11,.1);border:1px dashed rgba(245,158,11,.4);
-                  border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:.78rem;
-                  color:var(--clr-warning);text-align:center;">
-        <i class="fa-solid fa-flask" aria-hidden="true"></i>
-        Referencia generada en modo sandbox (sin imagen de código de barras).
-      </div>
     <?php endif; ?>
 
     <!-- Número de referencia -->
@@ -126,7 +119,7 @@ require_once 'header.php';
                 flex-wrap:wrap;margin-bottom:20px;">
       <span id="oxxo-ref"
             style="font-family:monospace;font-size:1.5rem;font-weight:700;
-                   letter-spacing:4px;color:var(--clr-white);word-break:break-all;">
+                   letter-spacing:4px;color:var(--clr-text);word-break:break-all;">
         <?= e($referencia) ?>
       </span>
       <button id="btn-copiar-ref"

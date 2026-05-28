@@ -14,16 +14,18 @@ $cashback = (int)($_SESSION['pago_cashback']  ?? 0);
 $pedidoId = (int)($_SESSION['pago_pedido_id'] ?? 0);
 unset($_SESSION['pago_exitoso'], $_SESSION['pago_cashback'], $_SESSION['pago_pedido_id']);
 
-/* Cargar productos del pedido para el modal (sin códigos) */
+/* Cargar productos del pedido para el modal con IDs individuales */
 $mpProductos = [];
 if ($pedidoId) {
     $stmtProd = $conn->prepare(
-        "SELECT ca.nombre_producto, ca.imagen_producto,
+        "SELECT ca.id AS codigo_id, ca.nombre_producto, ca.imagen_producto,
+                COALESCE(p.precio, 0) AS precio,
                 COALESCE(GROUP_CONCAT(DISTINCT pp.id_plataforma ORDER BY pp.id_plataforma SEPARATOR ','), '') AS plataformas
          FROM codigos_activacion ca
+         LEFT JOIN productos p ON ca.id_producto = p.id_producto
          LEFT JOIN producto_plataforma pp ON ca.id_producto = pp.id_producto
          WHERE ca.id_pedido = ?
-         GROUP BY ca.id, ca.nombre_producto, ca.imagen_producto
+         GROUP BY ca.id, ca.nombre_producto, ca.imagen_producto, p.precio
          ORDER BY ca.id"
     );
     $stmtProd->bind_param("i", $pedidoId);
@@ -34,14 +36,19 @@ if ($pedidoId) {
             ? array_map('intval', explode(',', $row['plataformas']))
             : [];
         $mpProductos[$pedidoId][] = [
+            'codigo_id'       => (int)$row['codigo_id'],
             'nombre_producto' => $row['nombre_producto'],
             'imagen_producto' => $row['imagen_producto'],
             'plataformas'     => $plats,
+            'precio'          => (float)$row['precio'],
+            'confirmado'      => 0,
+            'devuelto'        => 0,
+            'codigo'          => null,
         ];
     }
     $stmtProd->close();
 }
-$mpCodigos = []; /* Aún no confirmado — sin códigos */
+$mpCodigos = []; /* Sin códigos aún — se revelan al confirmar */
 ?>
 
 <div class="result-page" aria-label="Pago exitoso">
