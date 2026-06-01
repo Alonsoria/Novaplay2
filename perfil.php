@@ -116,7 +116,7 @@ $stmtPed = $conn->prepare(
             COALESCE(oxxo_referencia, '') AS oxxo_referencia,
             oxxo_expira
      FROM pedidos
-     WHERE id_usuario = ? ORDER BY fecha DESC LIMIT 20"
+     WHERE id_usuario = ? ORDER BY fecha DESC"
 );
 $stmtPed->bind_param("i", $uid);
 $stmtPed->execute();
