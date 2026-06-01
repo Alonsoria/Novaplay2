@@ -151,7 +151,7 @@ if ($cashback > 0) {
 
     if ($mesBD !== $mesCurrent) {
         $stmtPts = $conn->prepare(
-            "UPDATE usuarios SET puntos = ?, puntos_reset_mes = ? WHERE id_usuario = ?"
+            "UPDATE usuarios SET puntos = puntos + ?, puntos_reset_mes = ? WHERE id_usuario = ?"
         );
         $stmtPts->bind_param("isi", $cashback, $mesCurrent, $uid);
     } else {

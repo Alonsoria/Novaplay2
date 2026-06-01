@@ -36,7 +36,22 @@ $pedidoRow = $stmtPed->get_result()->fetch_assoc();
 $stmtPed->close();
 
 if (!$pedidoRow) {
-    /* Ya fue pagado o no existe */
+    /* Ya fue pagado, cancelado o no existe */
+    header('Location: perfil.php#pedidos');
+    exit;
+}
+
+/* ── Cancelar si el tiempo de pago ya venció ── */
+$expiraTsCheck = (int)strtotime($pedidoRow['oxxo_expira']);
+if ($expiraTsCheck > 0 && $expiraTsCheck < time()) {
+    $stmtCan = $conn->prepare(
+        "UPDATE pedidos SET estado = 'cancelado'
+         WHERE id_pedido = ? AND estado = 'pendiente_oxxo'"
+    );
+    $stmtCan->bind_param("i", $pedidoId);
+    $stmtCan->execute();
+    $stmtCan->close();
+    $_SESSION['oxxo_pedido_id'] = null;
     header('Location: perfil.php#pedidos');
     exit;
 }
@@ -243,10 +258,25 @@ require_once 'header.php';
   var expiraTs = <?= (int)$expiraTs ?>;
   var el = document.getElementById('oxxo-countdown');
 
+  var cancelado = false;
+
   function tick() {
     var diff = Math.max(0, expiraTs - Math.floor(Date.now() / 1000));
     if (diff === 0) {
       if (el) el.textContent = 'Expirado';
+      if (!cancelado) {
+        cancelado = true;
+        fetch('cancelar_oxxo.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'pedido_id=<?= (int)$pedidoId ?>',
+        }).finally(function () {
+          /* Redirigir al perfil tras cancelar */
+          setTimeout(function () {
+            window.location.href = 'perfil.php#pedidos';
+          }, 2500);
+        });
+      }
       return;
     }
     var h = Math.floor(diff / 3600);

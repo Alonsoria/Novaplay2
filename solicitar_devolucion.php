@@ -172,11 +172,12 @@ $stmtIns->bind_param("iis", $pedidoId, $uid, $productosJson);
 $stmtIns->execute();
 $stmtIns->close();
 
-/* ── Devolución OXXO: reembolso como puntos en lugar de tarjeta ── */
+/* ── Devolución OXXO / Puntos: reembolso como puntos en lugar de tarjeta ── */
 $esOxxo           = ($pedido['metodo_pago'] === 'oxxo');
+$esPuntos         = ($pedido['metodo_pago'] === 'puntos');
 $puntosAcreditados = 0;
 
-if ($esOxxo) {
+if ($esOxxo || $esPuntos) {
     $puntosAcreditados = (int)round($totalDevuelto);
     if ($puntosAcreditados > 0) {
         $stmtPtsAdd = $conn->prepare("UPDATE usuarios SET puntos = puntos + ? WHERE id_usuario = ?");
@@ -187,7 +188,7 @@ if ($esOxxo) {
 }
 
 /* ── Notificación en plataforma ── */
-if ($esOxxo) {
+if ($esOxxo || $esPuntos) {
     $msgNot = $pendientes > 0
         ? "Devolución parcial del pedido #{$pedidoId} aprobada. Se acreditaron {$puntosAcreditados} puntos a tu cuenta."
         : "Devolución del pedido #{$pedidoId} aprobada. Se acreditaron {$puntosAcreditados} puntos de Novaplay.";
@@ -213,7 +214,8 @@ $stmtU->close();
 
 $fechaPedido = date('d/m/Y', strtotime($pedido['fecha']));
 
-if ($esOxxo) {
+if ($esOxxo || $esPuntos) {
+    $tipoPago  = $esOxxo ? 'OXXO PAY' : 'PUNTOS NOVAPLAY';
     $emailBody = "Hola {$userData['nombre']},\n\n"
         . "¡Tu solicitud de devolución ha sido APROBADA!\n\n"
         . "────────────────────────────────────\n"
@@ -223,9 +225,9 @@ if ($esOxxo) {
         . "Fecha del pedido:  {$fechaPedido}\n\n"
         . "Productos devueltos:\n  - {$listaProductos}\n"
         . "\n────────────────────────────────────\n"
-        . "INFORMACIÓN DEL REEMBOLSO (OXXO PAY)\n"
+        . "INFORMACIÓN DEL REEMBOLSO ({$tipoPago})\n"
         . "────────────────────────────────────\n"
-        . "Como el pago original fue realizado en OXXO, el reembolso\n"
+        . "Como el pago original fue realizado con {$tipoPago}, el reembolso\n"
         . "se ha acreditado como puntos de Novaplay:\n\n"
         . "  Puntos acreditados: {$puntosAcreditados} pts (equivalentes a \${$puntosAcreditados}.00 MXN)\n\n"
         . "Puedes usar tus puntos como descuento en tu próxima compra.\n\n"

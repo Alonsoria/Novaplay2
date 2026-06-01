@@ -70,7 +70,7 @@ $stmtDP->close();
 
 /* ── Registrar pedido ── */
 $stmtP = $conn->prepare(
-    "INSERT INTO pedidos (id_usuario, total, estado) VALUES (?, ?, 'pagado')"
+    "INSERT INTO pedidos (id_usuario, total, estado, metodo_pago) VALUES (?, ?, 'pagado', 'puntos')"
 );
 $stmtP->bind_param("id", $uid, $total);
 $stmtP->execute();

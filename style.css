@@ -1908,12 +1908,43 @@ main > h2 {
   border: 1px solid var(--clr-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: transform var(--trans-mid), border-color var(--trans-mid);
+  position: relative;
+  transition: transform var(--trans-mid), box-shadow var(--trans-mid), border-color var(--trans-mid);
 }
 
 .combo-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--clr-accent);
+  transform: translateY(-6px);
+  border-color: var(--clr-accent-2);
+  box-shadow:
+    0 0 0 1px var(--clr-accent),
+    0 0 24px rgba(168,85,247,.5),
+    0 0 48px rgba(124,58,237,.3),
+    var(--shadow-card);
+}
+
+.combo-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent           35%,
+    rgba(255,255,255,.04) 42%,
+    rgba(255,255,255,.11) 50%,
+    rgba(255,255,255,.04) 58%,
+    transparent           65%
+  );
+  background-size: 200% 100%;
+  opacity: 0;
+  transition: opacity .25s ease;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 2;
+}
+
+.combo-card:hover::after {
+  opacity: 1;
+  animation: shimmerSlide .75s ease;
 }
 
 .combo-card__banner {
@@ -3674,7 +3705,8 @@ html.light-mode .TituloHero {
 }
 
 /* ── Card hover glow ── */
-html.light-mode .card:hover {
+html.light-mode .card:hover,
+html.light-mode .combo-card:hover {
   border-color: #6d28d9;
   box-shadow:
     0 0 0 1px rgba(91,33,182,.42),
@@ -3861,9 +3893,71 @@ html.light-mode .suc-prod-title   { color: #000000 !important; }
 .dev-prod-precio { color: #fff; }
 html.light-mode .dev-prod-precio { color: #000; }
 
-/* ── Shadow del precio de productos (.card strong) en modo claro ── */
+/* ── Botón "Ver pago en tienda" (OXXO) en modo claro ── */
+html.light-mode .btn-ver-tienda {
+  background: rgba(29,103,94,.12) !important;
+  border-color: rgba(29,103,94,.45) !important;
+  color: #1d675e !important;
+}
+
+/* ── Nombre del combo en modo claro ── */
+html.light-mode .combo-card__body h3 {
+  color: #000 !important;
+}
+
+/* ── Botón Pagar con Puntos — gradiente fluido pink→purple ── */
+.btn-pagar-puntos {
+  width: 100%;
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 12px var(--space-md);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: .95rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(90deg, #d60d7b, #8a0589, #a855f7, #d60d7b);
+  background-size: 300% auto;
+  animation: puntosFlow 3s linear infinite;
+  box-shadow:
+    0 0 14px rgba(214,13,123,.55),
+    0 0 30px rgba(138,5,137,.35);
+  transition: transform .2s ease, box-shadow .2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-pagar-puntos:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 22px rgba(214,13,123,.75),
+    0 0 48px rgba(168,85,247,.5);
+}
+
+.btn-pagar-puntos:active {
+  transform: translateY(0);
+}
+
+@keyframes puntosFlow {
+  0%   { background-position: 0% center; }
+  100% { background-position: 300% center; }
+}
+
+/* ── Precio de productos en modo claro (#c80090) ── */
 html.light-mode .card strong {
-  text-shadow: 0 0 8px rgba(138,0,52,.5);
+  color: #c80090;
+  text-shadow: 0 0 8px rgba(200,0,144,.3);
+}
+
+html.light-mode .combo-price-new {
+  color: #c80090;
+  text-shadow: 0 0 8px rgba(200,0,144,.3);
 }
 
 /* ── Cart summary box: reemplaza el negro del gradiente en modo claro ── */

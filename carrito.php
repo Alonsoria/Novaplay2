@@ -282,6 +282,22 @@ if (!empty($_SESSION['pago_error'])) {
           </div>
 
           <!-- Métodos de pago -->
+
+          <?php
+          /* Pagar con Puntos: visible si el usuario cubre el total bruto (incluso cuando
+             el descuento parcial ya llevó $totalFinal a $0). Va primero para mayor visibilidad. */
+          $puntosAlcanzan = $total > 0 && $userPuntos >= (int)ceil($total);
+          if ($puntosAlcanzan): ?>
+          <form method="POST" action="pagar_con_puntos.php" style="margin-bottom:8px;">
+            <?= csrf_field() ?>
+            <button type="submit" class="btn-pagar-puntos">
+              <i class="fa-solid fa-star" aria-hidden="true"></i>
+              Pagar con Puntos
+              <span style="font-size:.76rem;font-weight:400;opacity:.9;">(<?= number_format($userPuntos) ?> pts)</span>
+            </button>
+          </form>
+          <?php endif; ?>
+
           <button type="button" class="btn btn-full pay-trigger" data-href="pago_tarjeta.php" style="margin-top:8px;">
             <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
             Pagar con Tarjeta
@@ -305,91 +321,6 @@ if (!empty($_SESSION['pago_error'])) {
             </button>
           </form>
 
-          <?php /* TEMPORALMENTE OCULTO — descomentar para restaurar "Pagar con Puntos"
-          if ($userPuntos > 0):
-            $puntosAlcanzan = $userPuntos >= (int)ceil($totalFinal);
-          ?>
-          <div style="position:relative;margin-top:8px;" id="pts-pay-wrap">
-            <button type="button" id="btn-pagar-puntos"
-                    <?= !$puntosAlcanzan ? 'disabled' : '' ?>
-                    style="width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);
-                           border:none;border-radius:var(--radius-sm);padding:11px;color:#fff;
-                           font-size:.9rem;font-weight:600;cursor:<?= $puntosAlcanzan ? 'pointer' : 'not-allowed' ?>;
-                           opacity:<?= $puntosAlcanzan ? '1' : '.55' ?>;display:flex;
-                           align-items:center;justify-content:center;gap:8px;">
-              <i class="fa-solid fa-star" aria-hidden="true"></i>
-              Pagar con Puntos
-              <span style="font-size:.78rem;font-weight:400;opacity:.85;">
-                (<?= number_format($userPuntos) ?> disponibles)
-              </span>
-            </button>
-            <?php if (!$puntosAlcanzan): ?>
-            <div id="pts-tooltip"
-                 style="display:none;position:absolute;bottom:calc(100% + 8px);left:50%;
-                        transform:translateX(-50%);background:#1a1a2e;color:var(--clr-text);
-                        font-size:.78rem;padding:10px 14px;border-radius:8px;white-space:nowrap;
-                        border:1px solid var(--clr-border);box-shadow:0 4px 16px rgba(0,0,0,.4);
-                        z-index:100;max-width:280px;white-space:normal;text-align:center;">
-              Tus <strong><?= number_format($userPuntos) ?> puntos</strong> ($<?= number_format($userPuntos, 2) ?> MXN)
-              no cubren el total de <strong>$<?= number_format($totalFinal, 2) ?></strong>.<br>
-              <span style="color:var(--clr-accent-2);">Puedes aplicarlos como descuento parcial
-              usando el campo de arriba.</span>
-            </div>
-            <?php endif; ?>
-          </div>
-          <?php endif;
-          */ ?>
-
-          <!-- Modal de advertencia: Pagar con Puntos -->
-          <div id="modal-pagar-puntos"
-               role="dialog" aria-modal="true" aria-labelledby="mppts-titulo"
-               style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);
-                      z-index:10002;align-items:center;justify-content:center;padding:16px;">
-            <div style="background:var(--clr-surface);border-radius:16px;padding:28px;
-                        max-width:500px;width:100%;max-height:90vh;overflow-y:auto;
-                        position:relative;box-shadow:0 0 50px rgba(0,0,0,.6);">
-              <button onclick="cerrarModalPuntos()" aria-label="Cerrar"
-                      style="position:absolute;top:14px;right:18px;background:none;border:none;
-                             color:var(--clr-text-muted);font-size:1.4rem;cursor:pointer;line-height:1;">
-                <i class="fa-solid fa-xmark"></i>
-              </button>
-
-              <h3 id="mppts-titulo"
-                  style="margin-bottom:4px;font-family:var(--font-display);font-size:1.1rem;color:var(--clr-warning);">
-                <i class="fa-solid fa-triangle-exclamation" style="margin-right:8px;" aria-hidden="true"></i>
-                ¡Atención — Puntos no reembolsables!
-              </h3>
-              <p style="font-size:.85rem;color:var(--clr-text-muted);margin-bottom:16px;">
-                Los puntos utilizados se descontarán <strong style="color:var(--clr-text);">de forma definitiva</strong>
-                y <strong style="color:var(--clr-warning);">no podrán ser reembolsados</strong> bajo ninguna circunstancia,
-                ni siquiera si solicitas una devolución de productos.
-              </p>
-
-              <!-- Productos del carrito con checkboxes -->
-              <p style="font-size:.82rem;color:var(--clr-text-muted);margin-bottom:8px;">
-                Marca cada producto para confirmar que aceptas las condiciones:
-              </p>
-              <div id="mppts-items"
-                   style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
-
-              <form method="POST" action="pagar_con_puntos.php" id="form-pagar-puntos">
-                <?= csrf_field() ?>
-                <button type="submit" id="mppts-btn-pagar"
-                        disabled
-                        style="width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);
-                               border:none;border-radius:8px;padding:11px;color:#fff;
-                               font-size:.95rem;font-weight:600;cursor:not-allowed;opacity:.5;
-                               display:flex;align-items:center;justify-content:center;gap:8px;">
-                  <i class="fa-solid fa-star" aria-hidden="true"></i>
-                  Acepto y pago con puntos
-                </button>
-              </form>
-              <p style="font-size:.75rem;color:var(--clr-text-muted);text-align:center;margin-top:8px;">
-                Debes marcar todos los productos para habilitar el pago.
-              </p>
-            </div>
-          </div>
-
         </div>
       </div>
 
@@ -400,73 +331,6 @@ if (!empty($_SESSION['pago_error'])) {
 </main>
 
 <script>
-/* ── Datos del carrito para el modal de puntos ── */
-const cartItemsData = [
-  <?php foreach ($items as $item): ?>
-  { id: <?= (int)$item['id'] ?>, nombre: <?= json_encode($item['nombre']) ?>, precio: <?= (float)$item['precio'] ?>, cantidad: <?= (int)$item['cantidad'] ?>, imagen: <?= json_encode($item['imagen'] ?? '') ?> },
-  <?php endforeach; ?>
-];
-
-/* ── Modal: construir un checkbox por unidad de cada producto ── */
-function buildPuntosItems() {
-  const container = document.getElementById('mppts-items');
-  if (!container) return;
-  container.innerHTML = '';
-  cartItemsData.forEach(function (item) {
-    const liveCant = parseInt((document.getElementById('qty-' + item.id) || {}).textContent, 10) || item.cantidad;
-    for (let i = 0; i < liveCant; i++) {
-      const label = document.createElement('label');
-      label.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--clr-surface-2);border-radius:10px;border:1px solid var(--clr-border);cursor:pointer;';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.style.cssText = 'width:18px;height:18px;cursor:pointer;flex-shrink:0;accent-color:#7c3aed;';
-      cb.addEventListener('change', validatePuntosForm);
-      const img = document.createElement('img');
-      img.src = item.imagen || '';
-      img.alt = item.nombre;
-      img.style.cssText = 'width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0;';
-      img.onerror = function () { this.style.display = 'none'; };
-      const info = document.createElement('div');
-      info.style.cssText = 'flex:1;font-size:.85rem;color:var(--clr-text);';
-      info.textContent = item.nombre;
-      if (liveCant > 1) {
-        const sm = document.createElement('small');
-        sm.style.cssText = 'display:block;color:var(--clr-text-muted);font-size:.75rem;';
-        sm.textContent = 'Unidad ' + (i + 1) + ' de ' + liveCant;
-        info.appendChild(sm);
-      }
-      label.appendChild(cb); label.appendChild(img); label.appendChild(info);
-      container.appendChild(label);
-    }
-  });
-  validatePuntosForm();
-}
-
-function validatePuntosForm() {
-  const checks = document.querySelectorAll('#mppts-items input[type="checkbox"]');
-  const btn    = document.getElementById('mppts-btn-pagar');
-  if (!btn) return;
-  const ok = checks.length > 0 && Array.from(checks).every(function (c) { return c.checked; });
-  btn.disabled      = !ok;
-  btn.style.cursor  = ok ? 'pointer'  : 'not-allowed';
-  btn.style.opacity = ok ? '1'        : '.5';
-}
-
-function abrirModalPuntos() {
-  const m = document.getElementById('modal-pagar-puntos');
-  if (!m) return;
-  buildPuntosItems();
-  m.style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-}
-
-function cerrarModalPuntos() {
-  const m = document.getElementById('modal-pagar-puntos');
-  if (!m) return;
-  m.style.display = 'none';
-  document.body.style.overflow = '';
-}
-
 (function () {
   const precios = {
     <?php foreach ($items as $item): ?>
@@ -571,27 +435,6 @@ function cerrarModalPuntos() {
     });
   }
 
-  /* ── Tooltip del botón Pagar con Puntos cuando está deshabilitado ── */
-  const ptsWrap    = document.getElementById('pts-pay-wrap');
-  const ptsTooltip = document.getElementById('pts-tooltip');
-  if (ptsWrap && ptsTooltip) {
-    ptsWrap.addEventListener('mouseenter', function () { ptsTooltip.style.display = 'block'; });
-    ptsWrap.addEventListener('mouseleave', function () { ptsTooltip.style.display = 'none'; });
-  }
-
-  /* ── Abrir modal al hacer clic en el botón activo ── */
-  const btnPts = document.getElementById('btn-pagar-puntos');
-  if (btnPts && !btnPts.disabled) {
-    btnPts.addEventListener('click', abrirModalPuntos);
-  }
-
-  /* ── Cerrar modal al hacer clic en el backdrop ── */
-  const modalPts = document.getElementById('modal-pagar-puntos');
-  if (modalPts) {
-    modalPts.addEventListener('click', function (e) {
-      if (e.target === modalPts) cerrarModalPuntos();
-    });
-  }
 })();
 </script>
 

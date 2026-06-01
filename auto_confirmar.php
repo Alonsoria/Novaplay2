@@ -87,7 +87,7 @@ if ($resCashback) {
 
         if ($mesBD !== $mesCurrent) {
             $stmtPts = $conn->prepare(
-                "UPDATE usuarios SET puntos = ?, puntos_reset_mes = ? WHERE id_usuario = ?"
+                "UPDATE usuarios SET puntos = puntos + ?, puntos_reset_mes = ? WHERE id_usuario = ?"
             );
             $stmtPts->bind_param("isi", $cashback, $mesCurrent, $uid);
         } else {
@@ -100,7 +100,17 @@ if ($resCashback) {
     }
 }
 
+/* ── 4. Cancelar pedidos OXXO cuyo plazo de pago venció (oxxo_expira < NOW()) ── */
+$conn->query(
+    "UPDATE pedidos SET estado = 'cancelado'
+     WHERE estado = 'pendiente_oxxo'
+       AND oxxo_expira IS NOT NULL
+       AND oxxo_expira < NOW()"
+);
+$cancelados = $conn->affected_rows;
+
 $log("Ítems auto-confirmados : {$itemsConfirmados}");
 $log("Pedidos cerrados       : {$pedidosCerrados}");
 $log("Usuarios con cashback  : {$usuariosActualizados}");
+$log("Pedidos OXXO cancelados: {$cancelados}");
 $log('Completado.');

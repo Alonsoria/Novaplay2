@@ -97,6 +97,16 @@ $stmtD->execute();
 $user = $stmtD->get_result()->fetch_assoc();
 $stmtD->close();
 
+/* ── Reset semestral de puntos (1-ene / 1-jul) ── */
+nova_check_puntos_reset($conn, $uid);
+
+/* Recargar puntos tras posible reset */
+$stmtPtsRef = $conn->prepare("SELECT puntos FROM usuarios WHERE id_usuario = ?");
+$stmtPtsRef->bind_param("i", $uid);
+$stmtPtsRef->execute();
+$user['puntos'] = (int)($stmtPtsRef->get_result()->fetch_assoc()['puntos'] ?? 0);
+$stmtPtsRef->close();
+
 /* ── Pedidos del usuario ── */
 $pedidos = [];
 $stmtPed = $conn->prepare(
@@ -129,8 +139,8 @@ $confirmadoMap      = [];
 foreach ($pedidos as $ped) {
     $confirmadoMap[(int)$ped['id_pedido']] = (int)$ped['confirmado'];
 }
-/* IDs de pedidos PAGADOS (excluir pendiente_oxxo: sin códigos aún) */
-$pedidosPagados = array_filter($pedidos, fn($p) => $p['estado'] !== 'pendiente_oxxo');
+/* IDs de pedidos PAGADOS (excluir pendiente_oxxo y cancelado: sin códigos) */
+$pedidosPagados = array_filter($pedidos, fn($p) => !in_array($p['estado'], ['pendiente_oxxo', 'cancelado']));
 
 if (!empty($pedidosPagados)) {
     $idsPedidos = array_column($pedidosPagados, 'id_pedido');
@@ -239,8 +249,24 @@ try {
         </div>
       </div>
     </div>
-    <div style="font-size:.82rem;color:var(--clr-text-muted);">
-      Miembro desde <?= date('d/m/Y', strtotime($user['fecha_registro'] ?? 'now')) ?>
+    <div style="display:flex;flex-direction:column;gap:4px;text-align:right;">
+      <span style="font-size:.82rem;color:var(--clr-text-muted);">
+        Miembro desde <?= date('d/m/Y', strtotime($user['fecha_registro'] ?? 'now')) ?>
+      </span>
+      <?php
+      /* Calcular próxima fecha de reset para el aviso */
+      $hoyAv  = new DateTimeImmutable('today');
+      $mesAv  = (int)$hoyAv->format('n');
+      $anioAv = (int)$hoyAv->format('Y');
+      $proxReset = $mesAv >= 7
+          ? new DateTimeImmutable(($anioAv + 1) . '-01-01')
+          : new DateTimeImmutable("{$anioAv}-07-01");
+      $diasReset = (int)$hoyAv->diff($proxReset)->days;
+      ?>
+      <span style="font-size:.76rem;color:var(--clr-warning);display:flex;align-items:center;gap:4px;justify-content:flex-end;">
+        <i class="fa-solid fa-clock" aria-hidden="true"></i>
+        Puntos se resetean el <?= $proxReset->format('d/m/Y') ?> (en <?= $diasReset ?> días)
+      </span>
     </div>
   </div>
 
@@ -391,6 +417,7 @@ try {
                 $expiraTs      = strtotime($ped['fecha']) + 86400;
                 $hayDevolucion = (float)$ped['monto_devuelto'] > 0;
                 $esOxxoPend    = $ped['estado'] === 'pendiente_oxxo';
+                $esCancelado   = $ped['estado'] === 'cancelado';
                 $metodoPago    = $ped['metodo_pago'] ?? '';
               ?>
                 <tr data-pedido="<?= $pidInt ?>"
@@ -405,9 +432,14 @@ try {
                     <?= date('d/m/Y H:i', strtotime($ped['fecha'])) ?>
                   </td>
                   <td id="accion-td-<?= $pidInt ?>">
-                    <?php if ($esOxxoPend): ?>
+                    <?php if ($esCancelado): ?>
+                      <span style="color:var(--clr-danger);font-size:.82rem;white-space:nowrap;">
+                        <i class="fa-solid fa-ban" aria-hidden="true"></i> Cancelado
+                      </span>
+                    <?php elseif ($esOxxoPend): ?>
                       <!-- Pedido pendiente de pago en tienda -->
                       <a href="oxxo_pendiente.php?pedido_id=<?= $pidInt ?>"
+                         class="btn-ver-tienda"
                          style="display:inline-flex;align-items:center;gap:5px;
                                 background:rgba(13,148,136,.15);border:1px solid rgba(13,148,136,.4);
                                 border-radius:6px;padding:5px 10px;color:#2dd4bf;
@@ -441,7 +473,9 @@ try {
                     <?php endif; ?>
                   </td>
                   <td id="devolver-td-<?= $pidInt ?>">
-                    <?php if ($esOxxoPend): ?>
+                    <?php if ($esCancelado): ?>
+                      <span style="color:var(--clr-border);font-size:.85rem;">—</span>
+                    <?php elseif ($esOxxoPend): ?>
                       <!-- Pedido aún no pagado; no se puede devolver -->
                       <span style="color:var(--clr-warning);font-size:.8rem;white-space:nowrap;">
                         <i class="fa-solid fa-clock" aria-hidden="true"></i> Pago pendiente
@@ -452,11 +486,6 @@ try {
                         <?= $hasConf ? 'Parcial' : 'Reembolsado' ?>
                       </span>
                     <?php elseif ($hasPend): ?>
-                      <?php if ($hayDevolucion): ?>
-                        <span style="color:var(--clr-warning);font-size:.78rem;display:block;margin-bottom:3px;white-space:nowrap;">
-                          <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Dev. parcial
-                        </span>
-                      <?php endif; ?>
                       <button type="button"
                               class="btn-devolver"
                               data-pedido="<?= $pidInt ?>"
@@ -875,8 +904,6 @@ try {
           /* Quedan ítems pendientes: dejar el botón "Confirmar" tal como está, solo actualizar Devolver */
           if (devolverTd) {
             devolverTd.innerHTML =
-              '<span style="color:var(--clr-warning);font-size:.78rem;display:block;margin-bottom:3px;white-space:nowrap;">' +
-              '<i class="fa-solid fa-rotate-left"></i> Dev. parcial</span>' +
               '<button type="button" class="btn-devolver"' +
               ' data-pedido="' + activePedidoId + '"' +
               ' data-numero="' + activeNumDisplay + '"' +
