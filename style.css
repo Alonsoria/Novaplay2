@@ -3599,6 +3599,10 @@ html.light-mode .user-hover-card__name  { color: #2d1a45; }
 html.light-mode .user-hover-card__email { color: #7a5e9a; }
 html.light-mode .user-hover-card__pts   { border-top-color: rgba(90,58,110,.2); color: #7c3aed; }
 
+/* ── Email de verificación ── */
+.verification-email { color: white; }
+html.light-mode .verification-email { color: black; }
+
 /* ── Mobile nav ── */
 html.light-mode .mobile-nav                  { background: #f0e8fb; border-bottom-color: #d4c0e8; }
 html.light-mode .mobile-nav a,

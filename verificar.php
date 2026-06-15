@@ -145,7 +145,7 @@ $codeExpired = !empty($usuario['verification_expires'])
 
     <p style="color:var(--clr-text-muted);font-size:.9rem;text-align:center;margin-bottom:var(--space-md);">
       Enviamos un código de 6 caracteres a<br>
-      <strong style="color:var(--clr-white);"><?= e($pendingEmail) ?></strong><br>
+      <strong class="verification-email"><?= e($pendingEmail) ?></strong><br>
       Cópialo y pégalo aquí para activar tu cuenta.
     </p>
 
