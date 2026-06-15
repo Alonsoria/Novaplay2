@@ -160,7 +160,7 @@ require_once 'header.php';
   </div>
 
   <!-- Instrucciones -->
-  <div style="background:rgba(0,0,0,.3);border:1px solid var(--clr-border);
+  <div style="background:rgb(0 0 0 / 4%);border:1px solid var(--clr-border);
               border-radius:12px;padding:18px 20px;margin-bottom:20px;">
     <p style="font-size:.85rem;font-weight:600;color:var(--clr-text);margin:0 0 10px;">
       <i class="fa-solid fa-list-check" style="color:#0d9488;margin-right:6px;" aria-hidden="true"></i>

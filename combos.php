@@ -111,20 +111,13 @@ if ($result) {
             </div>
 
             <!-- Acción -->
-            <?php if (is_logged_in()): ?>
-              <button class="btn btn-add-combo mt-sm"
-                      data-combo="<?= (int)$combo['id_combo'] ?>"
-                      data-name="<?= e($combo['nombre']) ?>"
-                      style="width:100%;">
-                <i class="fa-solid fa-cart-plus" aria-hidden="true"></i>
-                Añadir al carrito
-              </button>
-            <?php else: ?>
-              <a href="login.php" class="btn mt-sm" style="width:100%;text-align:center;">
-                <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i>
-                Iniciar sesión para comprar
-              </a>
-            <?php endif; ?>
+            <button class="btn btn-add-combo mt-sm"
+                    data-combo="<?= (int)$combo['id_combo'] ?>"
+                    data-name="<?= e($combo['nombre']) ?>"
+                    style="width:100%;">
+              <i class="fa-solid fa-cart-plus" aria-hidden="true"></i>
+              Añadir al carrito
+            </button>
           </div>
 
         </article>
@@ -156,15 +149,16 @@ if ($result) {
     <p>Necesitas una cuenta para añadir combos al carrito.</p>
     <div class="modal-actions">
       <a href="login.php" class="btn-login">Iniciar sesión</a>
-      <a href="signup.php" class="btn-login" style="background:var(--clr-surface-2);border:1px solid var(--clr-border);">Registrarse</a>
+      <a href="signup.php" class="btn-login" style="background:#5100a1;border:1px solid var(--clr-border);">Registrarse</a>
     </div>
   </div>
 </div>
 
 <script>
 (function () {
-  const loginModal = document.getElementById('loginModal');
-  const closeBtn   = document.getElementById('loginModalClose');
+  const isLoggedIn  = <?= is_logged_in() ? 'true' : 'false' ?>;
+  const loginModal  = document.getElementById('loginModal');
+  const closeBtn    = document.getElementById('loginModalClose');
 
   if (closeBtn) closeBtn.addEventListener('click', function () { loginModal.style.display = 'none'; });
   if (loginModal) loginModal.addEventListener('click', function (e) {
@@ -173,6 +167,8 @@ if ($result) {
 
   document.querySelectorAll('.btn-add-combo').forEach(function (btn) {
     btn.addEventListener('click', function () {
+      if (!isLoggedIn) { loginModal.style.display = 'flex'; return; }
+
       const comboId = btn.dataset.combo;
       btn.disabled  = true;
 

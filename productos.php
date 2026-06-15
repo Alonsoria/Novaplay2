@@ -189,7 +189,7 @@ $plataformas = ['PlayStation', 'Xbox', 'Nintendo', 'Steam'];
     <p>Necesitas una cuenta para añadir productos al carrito.</p>
     <div class="modal-actions">
       <a href="login.php" class="btn-login">Iniciar sesión</a>
-      <a href="signup.php" class="btn-login" style="background:var(--clr-surface-2);border:1px solid var(--clr-border);">Registrarse</a>
+      <a href="signup.php" class="btn-login" style="background:#5100a1;border:1px solid var(--clr-border);">Registrarse</a>
     </div>
   </div>
 </div>
