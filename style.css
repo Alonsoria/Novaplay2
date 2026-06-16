@@ -3899,7 +3899,7 @@ html.light-mode .dev-prod-precio { color: #000; }
 
 /* ── Alert error: rojo puro en modo claro, Alert success: verde en modo claro ── */
 html.light-mode .alert--error { color: #ff0000; }
-html.light.mode .alert--success { color: #00772b}
+html.light-mode .alert--success { color: #00772b; }
 
 /* ── Botón "Ver pago en tienda" (OXXO) en modo claro ── */
 html.light-mode .btn-ver-tienda {
